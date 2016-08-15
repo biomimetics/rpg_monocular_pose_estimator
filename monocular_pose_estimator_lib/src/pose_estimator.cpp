@@ -27,6 +27,7 @@
  */
 
 #include "monocular_pose_estimator_lib/pose_estimator.h"
+#include "ros/ros.h"
 
 namespace monocular_pose_estimator
 {
@@ -41,10 +42,11 @@ PoseEstimator::PoseEstimator()
   it_since_initialized_ = 0;
 }
 
-void PoseEstimator::augmentImage(cv::Mat &image)
+void PoseEstimator::augmentImage(cv::Mat &image, const bool found_body_pose)
 {
-  Visualization::createVisualizationImage(image, predicted_pose_, camera_matrix_K_, camera_distortion_coeffs_,
-                                          region_of_interest_, distorted_detection_centers_);
+  Visualization::createVisualizationImage(image, found_body_pose, 
+    predicted_pose_, camera_matrix_K_, camera_distortion_coeffs_,
+    region_of_interest_, distorted_detection_centers_, blob_hues_);
 }
 
 void PoseEstimator::setMarkerPositions(List4DPoints positions_of_markers_on_object)
@@ -54,9 +56,28 @@ void PoseEstimator::setMarkerPositions(List4DPoints positions_of_markers_on_obje
   histogram_threshold_ = Combinations::numCombinations(object_points_.size(), 3);
 }
 
+void PoseEstimator::setMarkerHues(std::vector<int> &marker_hues) {
+  marker_hues_ = marker_hues;
+}
+
 List4DPoints PoseEstimator::getMarkerPositions()
 {
   return object_points_;
+}
+
+void PoseEstimator::findLeds(cv::Mat image, bool find_colors, List2DPoints &detected_led_positions) {
+  
+  if (find_colors) {
+    LEDDetector::findColorLeds(image, region_of_interest_, detection_threshold_value_, gaussian_sigma_, min_blob_area_,
+                          max_blob_area_, max_width_height_distortion_, max_circular_distortion_,
+                          detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
+                          camera_distortion_coeffs_, output_image_, blob_hues_);
+  } else {
+    LEDDetector::findLeds(image, region_of_interest_, detection_threshold_value_, gaussian_sigma_, min_blob_area_,
+                          max_blob_area_, max_width_height_distortion_, max_circular_distortion_,
+                          detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
+                          camera_distortion_coeffs_);
+  }
 }
 
 bool PoseEstimator::estimateBodyPose(cv::Mat image, double time_to_predict)
@@ -64,6 +85,8 @@ bool PoseEstimator::estimateBodyPose(cv::Mat image, double time_to_predict)
   pose_updated_ = false;
   // Set up pixel positions list
   List2DPoints detected_led_positions;
+  
+  //ROS_INFO("Estimating Pose");
 
   if (it_since_initialized_ < 1)  // If not yet initialised, search the whole image for the points
   {
@@ -72,19 +95,17 @@ bool PoseEstimator::estimateBodyPose(cv::Mat image, double time_to_predict)
     region_of_interest_ = cv::Rect(0, 0, image.cols, image.rows);
 
     // Do detection of LEDs in image
-    LEDDetector::findLeds(image, region_of_interest_, detection_threshold_value_, gaussian_sigma_, min_blob_area_,
-                          max_blob_area_, max_width_height_distortion_, max_circular_distortion_,
-                          detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
-                          camera_distortion_coeffs_);
+    findLeds(image, true, detected_led_positions);
 
     if (detected_led_positions.size() >= min_num_leds_detected_) // If found enough LEDs, Reinitialise
     {
       // Reinitialise
-//      ROS_WARN("Initialising using brute-force correspondence search.");
+      //ROS_WARN("Initialising using brute-force correspondence search.");
 
       setImagePoints(detected_led_positions);
 
-      if (initialise() == 1)
+      //if (initialise() == 1)
+      if (initialiseWithHues() == 1)
       {
         optimiseAndUpdatePose(time_to_predict);
       }
@@ -100,10 +121,7 @@ bool PoseEstimator::estimateBodyPose(cv::Mat image, double time_to_predict)
     predictWithROI(time_to_predict, image);
 
     // Search image within ROI
-    LEDDetector::findLeds(image, region_of_interest_, detection_threshold_value_, gaussian_sigma_, min_blob_area_,
-                          max_blob_area_, max_width_height_distortion_, max_circular_distortion_,
-                          detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
-                          camera_distortion_coeffs_);
+    findLeds(image, true, detected_led_positions);
 
     bool repeat_check = true;
     unsigned num_loops = 0;
@@ -122,22 +140,19 @@ bool PoseEstimator::estimateBodyPose(cv::Mat image, double time_to_predict)
         if (num_loops < 2)
         { // If haven't searched image yet, search image
 
-//          ROS_WARN("Too few LEDs detected in ROI. Searching whole image. Num LEDs detected: %d.", (int)detected_led_positions.size());
+          //ROS_WARN("Too few LEDs detected in ROI. Searching whole image. Num LEDs detected: %d.", (int)detected_led_positions.size());
 
           // Search whole image
           region_of_interest_ = cv::Rect(0, 0, image.cols, image.rows);
 
           // Do detection of LEDs in image
-          LEDDetector::findLeds(image, region_of_interest_, detection_threshold_value_, gaussian_sigma_, min_blob_area_,
-                                max_blob_area_, max_width_height_distortion_, max_circular_distortion_,
-                                detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
-                                camera_distortion_coeffs_);
+          findLeds(image, true, detected_led_positions);
 
         }
         else
         { // If already searched image continue
           repeat_check = false;
-//          ROS_WARN("Too few LEDs detected. Num LEDs detected: %d.", (int)detected_led_positions.size());
+          //ROS_WARN("Too few LEDs detected. Num LEDs detected: %d.", (int)detected_led_positions.size());
         }
       }
     } while (repeat_check);
@@ -285,6 +300,22 @@ VectorXuPairs PoseEstimator::getCorrespondences()
   return correspondences_;
 }
 
+void PoseEstimator::printCorrespondences() {
+  for (unsigned i = 0; i < correspondences_.rows(); i++) { 
+    unsigned m_idx = correspondences_(i,0)-1;
+    unsigned b_idx = correspondences_(i,1)-1;
+    std::cout << "M" << m_idx << " (";
+    if (m_idx >= 0 && m_idx < marker_hues_.size()) {
+      std::cout << marker_hues_[m_idx];
+    }
+    std::cout << ") - B" << b_idx << " (";
+    if (b_idx >= 0 && b_idx < blob_hues_.size()) {
+      std::cout << blob_hues_[b_idx];
+    }
+    std::cout << ")\n";
+  }
+}
+
 void PoseEstimator::calculateImageVectors()
 {
   unsigned num_image_points = image_points_.size();
@@ -397,6 +428,8 @@ unsigned PoseEstimator::checkCorrespondences()
   unsigned num_valid_correspondences = 0;
 
   // The unit image vectors from the camera out to the object points are already set when the image points are set in PoseEstimator::setImagePoints()
+  //ROS_INFO("Check Correspondences");
+  //printCorrespondences();
 
   if (correspondences_.rows() < 4)
   {
@@ -538,6 +571,7 @@ unsigned PoseEstimator::checkCorrespondences()
 
   }
 
+  //ROS_INFO("Check Correspondences Done");
   return valid_correspondences;
 }
 
@@ -720,6 +754,55 @@ unsigned PoseEstimator::initialise()
 
 }
 
+unsigned PoseEstimator::initialiseWithHues() {
+  //greedily assign correspondences to closest expected hue match
+  VectorXuPairs correspondences(blob_hues_.size(), 2);
+  std::vector<bool> used_marker;
+  
+  //ROS_INFO("Initialize with Hues");
+  
+  for (unsigned ii = 0; ii < marker_hues_.size(); ii++) used_marker.push_back(false);
+  unsigned num_correspondences = 0;
+  unsigned min_idx;
+  double min_diff, diff;
+  
+  for (unsigned blob_idx = 0; blob_idx < blob_hues_.size(); blob_idx++) {
+    min_diff = INFINITY;
+    min_idx = 0;
+    //std::cout << "\n" << blob_idx << ":\n";
+    for (unsigned marker_idx = 0; marker_idx < marker_hues_.size(); marker_idx++) {
+      //std::cout << used_marker[marker_idx] << "\n";
+      diff = std::abs(blob_hues_[blob_idx] - marker_hues_[marker_idx]);
+      if (diff < min_diff) {
+        min_diff = diff;
+        // Base one counting of entries, since an entry of 0 shows no correspondence.
+        min_idx = marker_idx;
+      }
+    }
+
+    //std::cout << blob_idx << "(" << blob_hues_[blob_idx] << ") - " << min_idx << 
+    // " (" << marker_hues_[min_idx] << ") : " << min_diff << "\n";
+
+    // Base one counting of entries, since an entry of 0 shows no correspondence.
+    if (!used_marker[min_idx]) {
+      correspondences(num_correspondences, 0) = min_idx + 1;
+      correspondences(num_correspondences, 1) = blob_idx + 1;
+      used_marker[min_idx] = true;
+      num_correspondences++;
+    }
+  }
+
+  correspondences.conservativeResize(num_correspondences, 2);
+
+  correspondences_ = correspondences;
+  //printCorrespondences();
+  if (checkCorrespondences() == 1) {
+    return 1; // Found a solution
+  } else {
+    return 0; // Failed to find a solution
+  }
+}
+
 void PoseEstimator::setPredictedTime(double time)
 {
   predicted_time_ = time;
@@ -839,7 +922,8 @@ void PoseEstimator::findCorrespondencesAndPredictPose(double & time_to_predict)
   else
   { // Reinitialise if the correspondences weren't correct
 
-    if (initialise() == 1)
+    //if (initialise() == 1)
+    if (initialiseWithHues() == 1)
     { // Only update pose if the initialisation found a valid pose.
       optimiseAndUpdatePose(time_to_predict);
     }

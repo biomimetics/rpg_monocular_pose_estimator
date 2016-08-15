@@ -87,6 +87,23 @@ public:
                        List2DPoints &pixel_positions, std::vector<cv::Point2f> &distorted_detection_centers,
                        const cv::Mat &camera_matrix_K, const std::vector<double> &camera_distortion_coeffs);
 
+  /*
+   * Same as above, but expects a color image and reports the average hue of each
+   * found blob in blob_hues. This function first converts the color image to
+   * an HSV image and thresholds it by S to the value in threshold_value.
+   *
+   * \param blob_hues (output) the vector containing the hue values from 0 to 180.
+   * \param output_image (output) a processed image showing the result of thresholding.
+   *
+   */
+  static void findColorLeds(const cv::Mat &image, cv::Rect ROI,
+    const int &threshold_value, const double &gaussian_sigma,
+    const double &min_blob_area, const double &max_blob_area,
+    const double &max_width_height_distortion, const double &max_circular_distortion,
+    List2DPoints &pixel_positions, std::vector<cv::Point2f> &distorted_detection_centers,
+    const cv::Mat &camera_matrix_K, const std::vector<double> &camera_distortion_coeffs,
+    cv::Mat &output_image, std::vector<int> &blob_hues);
+
   /**
    * Calculates the region of interest (ROI) in the distorted image in which the points lie.
    *

@@ -62,9 +62,10 @@ public:
                                                const cv::Mat camera_matrix_K,
                                                const std::vector<double> camera_distortion_coeffs);
 
-  static void createVisualizationImage(cv::Mat &image, Eigen::Matrix4d transform, const cv::Mat camera_matrix_K,
+  static void createVisualizationImage(cv::Mat &image, const bool found_body_pose,
+                                       Eigen::Matrix4d transform, const cv::Mat camera_matrix_K,
                                        const std::vector<double> camera_distortion_coeffs, cv::Rect region_of_interest,
-                                       std::vector<cv::Point2f> distorted_detection_centers);
+                                       std::vector<cv::Point2f> distorted_detection_centers, std::vector<int> blob_hues);
 
 };
 

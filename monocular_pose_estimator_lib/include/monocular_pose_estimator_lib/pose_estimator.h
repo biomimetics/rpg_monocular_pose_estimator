@@ -76,6 +76,10 @@ private:
   unsigned it_since_initialized_; //!< Counter to determine whether the system has been initialised already
   cv::Rect region_of_interest_; //!< OpenCV rectangle that defines the region of interest to be processd to find the LEDs in the image
   static const unsigned min_num_leds_detected_ = 4; //!< Minimum number of LEDs that need to be detected for a pose to be calculated
+
+  cv::Mat output_image_; //Debug image from LED detection phase
+  std::vector<int> blob_hues_; // Dominant hues of detected LEDs
+  std::vector<int> marker_hues_; // Dominant hues of marker LEDs
   bool pose_updated_;
 
 public:
@@ -338,7 +342,7 @@ public:
    */
   PoseEstimator();
 
-  void augmentImage(cv::Mat &image);
+  void augmentImage(cv::Mat &image, const bool found_body_pose);
 
   /**
    * Sets the positions of the markers on the object.
@@ -351,6 +355,13 @@ public:
   void setMarkerPositions(List4DPoints positions_of_markers_on_object);
 
   /**
+   * Set the hues of the markers.
+   *
+   * \param marker_hues vector containing the hues of markers from 0 to 180.
+   */
+  void setMarkerHues(std::vector<int> &marker_hues);
+  
+  /**
    * Returns the positions of the markers on the object in the object-fixed coordinate frame
    *
    * \return vector containing the position of the LEDs/markers on the object in the object-fixed coordinate frame. The coordinates are given in homogeneous coordinates.
@@ -359,6 +370,15 @@ public:
    *
    */
   List4DPoints getMarkerPositions();
+  
+  /**
+   * A function that switching between the color and non-color verion of findLeds
+   *
+   * \param image image to search for LED blobs
+   * \param find_colors if true set blob_hues_, otherwise just look for centroids
+   * \param detected_led_positions (output) resulting LED blob positions
+   */
+  void findLeds(cv::Mat image, bool find_colors, List2DPoints &detected_led_positions);
 
   /**
    * Estimates the pose of the tracked object
@@ -471,6 +491,11 @@ public:
    *
    */
   VectorXuPairs getCorrespondences();
+
+  /**
+   * Print the correspondence vector with hue information.
+   */
+  void printCorrespondences();
 
   /**
    * Sets the back-projection pixel tolerance that is used to determine whether an LED and image detection correspondence is correct.
@@ -747,6 +772,11 @@ public:
    * \see correspondencesFromHistogram, checkCorrespondences
    */
   unsigned initialise();
+
+  /**
+   * Output same as above, but uses marker hues to find correspondences.
+   */
+  unsigned initialiseWithHues();
 
   /**
    * Optimises the predicted pose using a Gauss-Newton optimisation to minimise the squared reprojection error between the LEDs/markers and image detections.

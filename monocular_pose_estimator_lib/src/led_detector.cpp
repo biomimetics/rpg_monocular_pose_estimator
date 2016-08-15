@@ -27,9 +27,157 @@
  */
 
 #include "monocular_pose_estimator_lib/led_detector.h"
+#include "ros/ros.h"
 
 namespace monocular_pose_estimator
 {
+
+void LEDDetector::findColorLeds(const cv::Mat &image, cv::Rect ROI,
+  const int &threshold_value, const double &gaussian_sigma,
+  const double &min_blob_area, const double &max_blob_area,
+  const double &max_width_height_distortion, const double &max_circular_distortion,
+  List2DPoints &pixel_positions, std::vector<cv::Point2f> &distorted_detection_centers,
+  const cv::Mat &camera_matrix_K, const std::vector<double> &camera_distortion_coeffs,
+  cv::Mat &output_image, std::vector<int> &blob_hues) {
+  
+  // Convert ROI in BGR to HSV image
+  cv::Mat hsv_image;
+  
+  //ROS_INFO("Starting initial color conversion %d %d", image.depth(), image.channels());
+  
+  cv::cvtColor(image(ROI), hsv_image, cv::COLOR_BGR2HSV);
+  
+  //ROS_INFO("Initial color conversion complete");
+
+  std::vector<cv::Mat> hsv_channels(3);
+  cv::split(hsv_image, hsv_channels);
+
+  // Threshold image based on (blurred?) Saturation value
+  cv::Mat thresh_image;
+  cv::threshold(hsv_channels[1], thresh_image, threshold_value, 255, cv::THRESH_TOZERO);
+
+  // Gaussian blur the image
+  cv::Size ksize; // Gaussian kernel size. If equal to zero, then the kernel size is computed from the sigma
+  ksize.width = 0;
+  ksize.height = 0;
+  GaussianBlur(thresh_image.clone(), output_image, ksize, gaussian_sigma, gaussian_sigma, cv::BORDER_DEFAULT);
+
+  // Identify the blobs contours in the image
+  std::vector<std::vector<cv::Point> > init_contours;
+  cv::findContours(output_image.clone(), init_contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+
+  // If the standard deviation of a colored blob area is greater than 5, split
+  // into two regions of Hue value by thresholding above and below mean (may
+  // need to perform some modulo trickery for values around red)
+  std::vector<std::vector<cv::Point> > contours;
+  std::vector<cv::Rect> bounding_rects;
+  std::vector<int> init_blob_hues;
+
+  for (unsigned i = 0; i < init_contours.size(); i++) {
+    cv::Rect bounding_rect = cv::boundingRect(init_contours[i]);
+    cv::Mat sat_mask = hsv_channels[1](bounding_rect);
+    cv::Mat hue_region = hsv_channels[0](bounding_rect);
+
+    cv::Scalar mean, stddev;
+    cv::meanStdDev(hue_region, mean, stddev, sat_mask);
+    
+    if (stddev.val[0] > 5.0) {
+      //ROS_INFO("Splitting blob at %d %d %f", bounding_rect.x, bounding_rect.y, stddev.val[0]);
+      cv::Mat hue_mask, split_mask;
+      std::vector<std::vector<cv::Point> > split_contours_high, split_contours_low;
+      cv::Point offset(bounding_rect.x, bounding_rect.y);
+      cv::threshold(hue_region, hue_mask, mean.val[0], 255, cv::THRESH_BINARY);
+      
+      cv::bitwise_and(sat_mask, hue_mask, split_mask);
+      cv::findContours(split_mask.clone(), split_contours_high, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE, offset);
+      if (split_contours_high.size() > 0) {
+        contours.push_back(split_contours_high[0]);
+        bounding_rects.push_back(cv::boundingRect(split_contours_high[0]));
+        cv::meanStdDev(hue_region, mean, stddev, split_mask);
+        init_blob_hues.push_back((int)mean.val[0]);
+        //ROS_INFO("New rect high %d %d %d", bounding_rects.back().x, bounding_rects.back().y, blob_hues.back());
+      }
+     
+      cv::Mat flip_hue_mask, flip_split_mask;
+      cv::bitwise_not(hue_mask, flip_hue_mask);
+      cv::bitwise_and(sat_mask, flip_hue_mask, flip_split_mask);
+      cv::findContours(flip_split_mask.clone(), split_contours_low, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE, offset);
+      if (split_contours_low.size() > 0) {
+        contours.push_back(split_contours_low[0]);
+        bounding_rects.push_back(cv::boundingRect(split_contours_low[0]));
+        cv::meanStdDev(hue_region, mean, stddev, flip_split_mask);
+        init_blob_hues.push_back((int)mean.val[0]);
+        //ROS_INFO("New rect low %d %d %d", bounding_rects.back().x, bounding_rects.back().y, blob_hues.back());
+      }
+    } else {
+      contours.push_back(init_contours[i]);
+      bounding_rects.push_back(bounding_rect);
+      init_blob_hues.push_back((int)mean.val[0]);
+    }
+  }
+  
+  //ROS_INFO("Done splitting contours %d %d %d", (int)contours.size(), (int)bounding_rects.size(), (int)init_blob_hues.size());
+
+  unsigned numPoints = 0; // Counter for the number of detected LEDs
+
+  // Vector for containing the detected points that will be undistorted later
+  std::vector<cv::Point2f> distorted_points;
+  
+  blob_hues.clear();
+
+  // Find blob regions within min and max areas
+  for (unsigned i = 0; i < contours.size(); i++) {
+    double area = cv::contourArea(contours[i]); // Blob area
+    cv::Rect rect = bounding_rects[i]; 
+
+    cv::Moments mu;
+    mu = cv::moments(contours[i], false);
+    cv::Point2f mc;
+    mc = cv::Point2f(mu.m10 / mu.m00, mu.m01 / mu.m00) + cv::Point2f(ROI.x, ROI.y);
+    
+    // Look for round shaped blobs of the correct size
+    bool area_good = !std::isnan(mc.x) && !std::isnan(mc.y) && area >= min_blob_area && area <= max_blob_area;
+    bool aspect_good = std::abs(1 - std::min((double)rect.width / (double)rect.height, (double)rect.height / (double)rect.width))
+            <= max_width_height_distortion;
+    bool circular_good = std::abs(1 - (area / (CV_PI * std::pow(rect.width / 2, 2)))) <= max_circular_distortion
+        && std::abs(1 - (area / (CV_PI * std::pow(rect.height / 2, 2)))) <= max_circular_distortion;
+    if (area_good && aspect_good && circular_good) {
+      //ROS_INFO("Adding point %f %f %d", mc.x, mc.y, init_blob_hues[i]);
+      distorted_points.push_back(mc);
+      blob_hues.push_back(init_blob_hues[i]);
+      numPoints++;
+    } else {
+      //ROS_INFO("Rejecting point %f %f %d %d %d %d", mc.x, mc.y, init_blob_hues[i], area_good, aspect_good, circular_good);
+    }
+  }
+
+  // Report centers and colors of each blob, as well as distorted centers for
+  // visualization
+  // These will be used for the visualization
+  distorted_detection_centers = distorted_points;
+
+  if (numPoints > 0)
+  {
+    // Vector that will contain the undistorted points
+    std::vector<cv::Point2f> undistorted_points;
+
+    // Undistort the points
+    cv::undistortPoints(distorted_points, undistorted_points, camera_matrix_K, camera_distortion_coeffs, cv::noArray(),
+                        camera_matrix_K);
+
+    // Resize the vector to hold all the possible LED points
+    pixel_positions.resize(numPoints);
+
+    // Populate the output vector of points
+    for (unsigned j = 0; j < numPoints; ++j)
+    {
+      Eigen::Vector2d point;
+      point(0) = undistorted_points[j].x;
+      point(1) = undistorted_points[j].y;
+      pixel_positions(j) = point;
+    }
+  }
+}
 
 // LED detector
 void LEDDetector::findLeds(const cv::Mat &image, cv::Rect ROI, const int &threshold_value, const double &gaussian_sigma,

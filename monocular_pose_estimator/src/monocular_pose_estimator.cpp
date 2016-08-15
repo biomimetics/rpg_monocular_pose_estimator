@@ -58,7 +58,7 @@ MPENode::MPENode(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private)
 
   // Create the marker positions from the test points
   List4DPoints positions_of_markers_on_object;
-
+  std::vector<int> marker_hues;
   // Read in the marker positions from the YAML parameter file
   XmlRpc::XmlRpcValue points_list;
   if (!nh_private_.getParam("marker_positions", points_list))
@@ -71,6 +71,7 @@ MPENode::MPENode(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private)
   else
   {
     positions_of_markers_on_object.resize(points_list.size());
+    marker_hues.resize(points_list.size());
     for (int i = 0; i < points_list.size(); i++)
     {
       Eigen::Matrix<double, 4, 1> temp_point;
@@ -79,9 +80,12 @@ MPENode::MPENode(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private)
       temp_point(2) = points_list[i]["z"];
       temp_point(3) = 1;
       positions_of_markers_on_object(i) = temp_point;
+      double hue_value = points_list[i]["h"];
+      marker_hues[i] = (int)(hue_value);
     }
   }
   trackable_object_.setMarkerPositions(positions_of_markers_on_object);
+  trackable_object_.setMarkerHues(marker_hues);
   ROS_INFO("The number of markers on the object are: %d", (int )positions_of_markers_on_object.size());
 }
 
@@ -144,7 +148,7 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg)
   cv_bridge::CvImagePtr cv_ptr;
   try
   {
-    cv_ptr = cv_bridge::toCvCopy(image_msg, sensor_msgs::image_encodings::MONO8);
+    cv_ptr = cv_bridge::toCvCopy(image_msg, sensor_msgs::image_encodings::BGR8);
   }
   catch (cv_bridge::Exception& e)
   {
@@ -152,7 +156,7 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg)
     return;
   }
   cv::Mat image = cv_ptr->image;
-
+  
   // Get time at which the image was taken. This time is used to stamp the estimated pose and also calculate the position of where to search for the makers in the image
   double time_to_predict = image_msg->header.stamp.toSec();
 
@@ -198,11 +202,7 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg)
   if (image_pub_.getNumSubscribers() > 0)
   {
     cv::Mat visualized_image = image.clone();
-    cv::cvtColor(visualized_image, visualized_image, CV_GRAY2RGB);
-    if (found_body_pose)
-    {
-      trackable_object_.augmentImage(visualized_image);
-    }
+    trackable_object_.augmentImage(visualized_image, found_body_pose);
 
     // Publish image for visualization
     cv_bridge::CvImage visualized_image_msg;
