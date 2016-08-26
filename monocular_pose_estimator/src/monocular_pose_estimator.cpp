@@ -195,7 +195,7 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg)
   }
   else
   { // If pose was not updated
-    ROS_WARN("Unable to resolve a pose.");
+    //ROS_WARN("Unable to resolve a pose.");
   }
 
   // publish visualization image

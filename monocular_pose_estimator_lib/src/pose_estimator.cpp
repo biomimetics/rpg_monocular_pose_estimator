@@ -429,7 +429,7 @@ unsigned PoseEstimator::checkCorrespondences()
 
   // The unit image vectors from the camera out to the object points are already set when the image points are set in PoseEstimator::setImagePoints()
   //ROS_INFO("Check Correspondences");
-  //printCorrespondences();
+  printCorrespondences();
 
   if (correspondences_.rows() < 4)
   {

@@ -54,7 +54,7 @@ void LEDDetector::findColorLeds(const cv::Mat &image, cv::Rect ROI,
 
   // Threshold image based on (blurred?) Saturation value
   cv::Mat thresh_image;
-  cv::threshold(hsv_channels[1], thresh_image, threshold_value, 255, cv::THRESH_TOZERO);
+  cv::threshold(hsv_channels[2], thresh_image, threshold_value, 255, cv::THRESH_BINARY);
 
   // Gaussian blur the image
   cv::Size ksize; // Gaussian kernel size. If equal to zero, then the kernel size is computed from the sigma
@@ -75,39 +75,40 @@ void LEDDetector::findColorLeds(const cv::Mat &image, cv::Rect ROI,
 
   for (unsigned i = 0; i < init_contours.size(); i++) {
     cv::Rect bounding_rect = cv::boundingRect(init_contours[i]);
-    cv::Mat sat_mask = hsv_channels[1](bounding_rect);
+    cv::Mat region_mask = hsv_channels[2](bounding_rect);
     cv::Mat hue_region = hsv_channels[0](bounding_rect);
 
     cv::Scalar mean, stddev;
-    cv::meanStdDev(hue_region, mean, stddev, sat_mask);
+    cv::meanStdDev(hue_region, mean, stddev, region_mask);
     
-    if (stddev.val[0] > 5.0) {
+    if (stddev.val[0] > 16.0) {
       //ROS_INFO("Splitting blob at %d %d %f", bounding_rect.x, bounding_rect.y, stddev.val[0]);
+      //std::cout << hue_region;
       cv::Mat hue_mask, split_mask;
       std::vector<std::vector<cv::Point> > split_contours_high, split_contours_low;
       cv::Point offset(bounding_rect.x, bounding_rect.y);
       cv::threshold(hue_region, hue_mask, mean.val[0], 255, cv::THRESH_BINARY);
       
-      cv::bitwise_and(sat_mask, hue_mask, split_mask);
+      cv::bitwise_and(region_mask, hue_mask, split_mask);
       cv::findContours(split_mask.clone(), split_contours_high, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE, offset);
       if (split_contours_high.size() > 0) {
         contours.push_back(split_contours_high[0]);
         bounding_rects.push_back(cv::boundingRect(split_contours_high[0]));
         cv::meanStdDev(hue_region, mean, stddev, split_mask);
         init_blob_hues.push_back((int)mean.val[0]);
-        //ROS_INFO("New rect high %d %d %d", bounding_rects.back().x, bounding_rects.back().y, blob_hues.back());
+        //ROS_INFO("New rect high %d %d %d", bounding_rects.back().x, bounding_rects.back().y, init_blob_hues.back());
       }
      
       cv::Mat flip_hue_mask, flip_split_mask;
       cv::bitwise_not(hue_mask, flip_hue_mask);
-      cv::bitwise_and(sat_mask, flip_hue_mask, flip_split_mask);
+      cv::bitwise_and(region_mask, flip_hue_mask, flip_split_mask);
       cv::findContours(flip_split_mask.clone(), split_contours_low, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE, offset);
       if (split_contours_low.size() > 0) {
         contours.push_back(split_contours_low[0]);
         bounding_rects.push_back(cv::boundingRect(split_contours_low[0]));
         cv::meanStdDev(hue_region, mean, stddev, flip_split_mask);
         init_blob_hues.push_back((int)mean.val[0]);
-        //ROS_INFO("New rect low %d %d %d", bounding_rects.back().x, bounding_rects.back().y, blob_hues.back());
+        //ROS_INFO("New rect low %d %d %d", bounding_rects.back().x, bounding_rects.back().y, init_blob_hues.back());
       }
     } else {
       contours.push_back(init_contours[i]);
@@ -137,17 +138,23 @@ void LEDDetector::findColorLeds(const cv::Mat &image, cv::Rect ROI,
     
     // Look for round shaped blobs of the correct size
     bool area_good = !std::isnan(mc.x) && !std::isnan(mc.y) && area >= min_blob_area && area <= max_blob_area;
-    bool aspect_good = std::abs(1 - std::min((double)rect.width / (double)rect.height, (double)rect.height / (double)rect.width))
-            <= max_width_height_distortion;
-    bool circular_good = std::abs(1 - (area / (CV_PI * std::pow(rect.width / 2, 2)))) <= max_circular_distortion
-        && std::abs(1 - (area / (CV_PI * std::pow(rect.height / 2, 2)))) <= max_circular_distortion;
+    double aspect = std::abs(1 - std::min((double)rect.width / (double)rect.height, (double)rect.height / (double)rect.width));
+    bool aspect_good = aspect <= max_width_height_distortion;
+    double width_dist = std::abs(1 - (area / (CV_PI * std::pow(rect.width / 2, 2))));
+    double height_dist = std::abs(1 - (area / (CV_PI * std::pow(rect.height / 2, 2))));
+    bool circular_good = (width_dist <= max_circular_distortion) && (height_dist <= max_circular_distortion);
     if (area_good && aspect_good && circular_good) {
       //ROS_INFO("Adding point %f %f %d", mc.x, mc.y, init_blob_hues[i]);
       distorted_points.push_back(mc);
       blob_hues.push_back(init_blob_hues[i]);
       numPoints++;
     } else {
-      //ROS_INFO("Rejecting point %f %f %d %d %d %d", mc.x, mc.y, init_blob_hues[i], area_good, aspect_good, circular_good);
+      /*ROS_INFO("Rejecting point %f %f %d\n  area(%d): %f\n  aspt(%d): %f\n  circ(%d): %f, %f", 
+        mc.x, mc.y, init_blob_hues[i], 
+        area_good, area,
+        aspect_good, aspect,
+        circular_good, width_dist, height_dist);
+       */
     }
   }
 
