@@ -12,8 +12,8 @@ class RecordExperiment():
     self.recording = False
 
     self.setpoint_pub = rospy.Publisher('/record/desired_pose',PoseStamped,queue_size=1)
-    self.info_pub = rospy.Publisher('/record/usb_cam/camera_info',CameraInfo,queue_size=1)
-    self.image_pub = rospy.Publisher('/record/usb_cam/image_raw',Image,queue_size=1)
+    self.info_pub = rospy.Publisher('/record/camera_info',CameraInfo,queue_size=1)
+    self.image_pub = rospy.Publisher('/record/image_raw',Image,queue_size=1)
     self.pose_pub = rospy.Publisher('/record/estimated_pose',PoseWithCovarianceStamped,queue_size=1)
     
     rospy.Subscriber('/recording',Bool,self.recording_callback,queue_size=1)
@@ -21,7 +21,7 @@ class RecordExperiment():
     rospy.Subscriber('/desired_pose',PoseStamped,self.setpoint_callback,queue_size=1)
     rospy.Subscriber('/usb_cam/camera_info',CameraInfo,self.info_callback,queue_size=1)
     rospy.Subscriber('/usb_cam/image_raw',Image,self.image_callback,queue_size=1)
-    rospy.Subscriber('/estimated_pose',PoseWithCovarianceStamped,self.pose_callback,queue_size=1)
+    rospy.Subscriber('/monocular_pose_estimator/estimated_pose',PoseWithCovarianceStamped,self.pose_callback,queue_size=1)
 
   def run(self):
     while not rospy.is_shutdown():

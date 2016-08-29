@@ -2,6 +2,8 @@
 
 import rospy
 import numpy
+import sys
+
 from geometry_msgs.msg import PoseStamped,PoseWithCovarianceStamped,Pose,Point,Quaternion
 from std_msgs.msg import Bool
 from tf.transformations import *
@@ -22,39 +24,43 @@ class CommandListener:
 
   def run(self):
     while not rospy.is_shutdown():
-      command = raw_input('Command:')
+      try:
+        command = raw_input('Command:')
 
-      # Take measurement
-      if command == 't':
-        sequence_goal = self.sequence + 30
-        self.record_pub.publish(True)
+        # Take measurement
+        if command == 't':
+          sequence_goal = self.sequence + 30
+          self.record_pub.publish(True)
+          
+          while(self.sequence < sequence_goal):
+            self.publish_setpoint()
+            self.rate.sleep()
+          
+          self.record_pub.publish(False)
         
-        while(self.sequence < sequence_goal):
-          self.publish_setpoint()
-          self.rate.sleep()
+        # Set command
+        elif command[0] == 's':
+          if len(command) > 1 and command[1] == 'c':
+            self.center = self.pose
+            print 'Center: ' + str(self.center)
+          else:
+            self.setpoint = [float(v) for v in command.split()[1:]]
+            print 'Setpoint: ' + str(self.setpoint)
         
-        self.record_pub.publish(False)
-      
-      # Set command
-      elif command[0] == 's':
-        if len(command) > 1 and command[1] == 'c':
-          self.center = self.pose
-          print 'Center: ' + str(self.center)
-        else:
-          self.setpoint = [float(v) for v in command.split()[1:]]
+        # Step command
+        elif command[0] in axes:
+          self.setpoint[axes.index(command[0])] += float(command[1:])
           print 'Setpoint: ' + str(self.setpoint)
-      
-      # Step command
-      elif command[0] in axes:
-        self.setpoint[axes.index(command[0])] += float(command[1:])
-        print 'Setpoint: ' + str(self.setpoint)
 
-      # Center command
-      elif command[0] == 'c':
-        self.setpoint = self.center
-        print 'Setpoint: ' + str(self.setpoint)
+        # Center command
+        elif command[0] == 'c':
+          self.setpoint = self.center
+          print 'Setpoint: ' + str(self.setpoint)
 
-      self.rate.sleep()
+        self.rate.sleep()
+
+      except KeyboardInterrupt,EOFError:
+        sys.exit(0)
   
   def publish_setpoint(self):
     sp_msg = PoseStamped()
