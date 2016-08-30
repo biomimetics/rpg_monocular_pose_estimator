@@ -8,7 +8,7 @@ from geometry_msgs.msg import PoseStamped,PoseWithCovarianceStamped,Pose,Point,Q
 from std_msgs.msg import Bool
 from tf.transformations import *
 
-axes = ['x','y','z','r','p','y']
+axes = ['x','y','z','r','p','q']
 
 class CommandListener:
   def __init__(self):
@@ -59,9 +59,9 @@ class CommandListener:
 
         self.rate.sleep()
 
-      except KeyboardInterrupt,EOFError:
-        sys.exit(0)
-  
+      except EOFError:
+        sys.exit(0) 
+
   def publish_setpoint(self):
     sp_msg = PoseStamped()
     sp_msg.pose = Pose(

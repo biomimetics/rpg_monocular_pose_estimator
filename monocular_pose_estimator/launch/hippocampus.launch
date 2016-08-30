@@ -9,10 +9,10 @@
 	<group ns="monocular_pose_estimator" >
 		<node name="monocular_pose_estimator" pkg="monocular_pose_estimator" type="monocular_pose_estimator" respawn="false" output="screen"> 
 			<rosparam command="load" file="$(arg marker_positions_file)"/>
-			<param name= "threshold_value" value = "128" />
+			<param name= "threshold_value" value = "64" />
 			<param name= "gaussian_sigma" value = "0.6" />
-			<param name= "min_blob_area" value = "36" />
-			<param name= "max_blob_area" value = "900" />
+			<param name= "min_blob_area" value = "9" />
+			<param name= "max_blob_area" value = "3000" />
 			<param name= "max_width_height_distortion" value = "0.75" />
 			<param name= "max_circular_distortion" value = "0.75" />
 			<param name= "back_projection_pixel_tolerance" value = "5" />
