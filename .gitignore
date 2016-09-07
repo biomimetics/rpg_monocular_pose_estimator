@@ -1,3 +1,4 @@
 monocular_pose_estimator/bags/
+monocular_pose_estimator/data/
 *.swp
 *.pyc

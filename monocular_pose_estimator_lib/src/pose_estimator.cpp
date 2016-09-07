@@ -300,8 +300,44 @@ VectorXuPairs PoseEstimator::getCorrespondences()
   return correspondences_;
 }
 
+char hueToColor(int hue) {
+  switch (hue) {
+    case 0:
+      return 'R';
+    case 30:
+      return 'Y';
+    case 60:
+      return 'G';
+    case 90:
+      return 'C';
+    case 120:
+      return 'B';
+    case 150:
+      return 'M';
+    default:
+      return 'X';
+  }
+}
+
 void PoseEstimator::printCorrespondences() {
-  for (unsigned i = 0; i < correspondences_.rows(); i++) { 
+  char buf[16];
+  int matches[6] = {-1,-1,-1,-1,-1,-1};
+  for (unsigned i = 0; i < correspondences_.rows(); i++) {
+    matches[correspondences_(i,0)-1] = correspondences_(i,1)-1;
+  }
+  std::cout << "\nMatches:\n";
+  std::cout << matches[0] <<  matches[1] << matches[2] << matches[3] << matches[4] << matches[5] << "\n";
+  for (unsigned i = 0; i < marker_hues_.size(); i++) {
+    int hue = marker_hues_[i];
+    sprintf(buf, "  M%d-%c (%3d): ", i, hueToColor(hue), hue);
+    std::cout << buf;
+    if (matches[i] != -1) {
+      sprintf(buf, "B%d (%3d)", matches[i], blob_hues_[matches[i]]);
+      std::cout << buf;
+    }
+    std::cout << "\n";
+  }
+  /*for (unsigned i = 0; i < correspondences_.rows(); i++) { 
     unsigned m_idx = correspondences_(i,0)-1;
     unsigned b_idx = correspondences_(i,1)-1;
     std::cout << "M" << m_idx << " (";
@@ -313,7 +349,7 @@ void PoseEstimator::printCorrespondences() {
       std::cout << blob_hues_[b_idx];
     }
     std::cout << ")\n";
-  }
+  }*/
 }
 
 void PoseEstimator::calculateImageVectors()
