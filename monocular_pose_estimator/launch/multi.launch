@@ -1,0 +1,7 @@
+<launch>
+
+  <include file="$(find monocular_pose_estimator)/launch/webcam.launch" />
+  <include file="$(find monocular_pose_estimator)/launch/zumy.launch" />
+  <include file="$(find monocular_pose_estimator)/launch/zumy2.launch" />
+
+</launch>

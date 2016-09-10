@@ -1,13 +1,13 @@
 <launch> 
 
 	<!-- Name of the YAML file containing the marker positions -->
-	<arg name="YAML_file_name" default="zumy_marker_positions"/>
+	<arg name="YAML_file_name" default="zumy2_marker_positions"/>
 
 	<!-- File containing the the marker positions in the trackable's frame of reference -->
 	<arg name="marker_positions_file" default="$(find monocular_pose_estimator)/marker_positions/$(arg YAML_file_name).yaml"/> 
 
-	<group ns="robot0" >
-		<node name="estimator0" pkg="monocular_pose_estimator" type="monocular_pose_estimator" respawn="false" output="screen"> 
+	<group ns="robot1" >
+		<node name="estimator1" pkg="monocular_pose_estimator" type="monocular_pose_estimator" respawn="false"> 
 			<rosparam command="load" file="$(arg marker_positions_file)"/>
 			<param name= "threshold_value" value = "200" />
 			<param name= "gaussian_sigma" value = "0.6" />
@@ -24,7 +24,7 @@
       <remap from="/camera/image_raw" to="/usb_cam/image_raw" />
 		</node>
 	
-		<node name="robot0" pkg="image_view" type="image_view" args="image:=image_with_detections" />
+		<node name="robot1" pkg="image_view" type="image_view" args="image:=image_with_detections" />
 	</group>
 
 </launch>

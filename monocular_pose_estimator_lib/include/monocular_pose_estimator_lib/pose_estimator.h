@@ -746,7 +746,10 @@ public:
    *   - \b 1 if the correspondences are valid
    *
    */
+  unsigned checkCorrespondences(double &ratio);
+
   unsigned checkCorrespondences();
+  
 
   /**
    * Performs the brute-force initialisation to determine the LED/marker and image detection correspondences and the pose of the object.

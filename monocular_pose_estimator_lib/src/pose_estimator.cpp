@@ -325,31 +325,22 @@ void PoseEstimator::printCorrespondences() {
   for (unsigned i = 0; i < correspondences_.rows(); i++) {
     matches[correspondences_(i,0)-1] = correspondences_(i,1)-1;
   }
-  std::cout << "\nMatches:\n";
-  std::cout << matches[0] <<  matches[1] << matches[2] << matches[3] << matches[4] << matches[5] << "\n";
+  std::cout << "\nMatches:";
+  for (unsigned j = 0; j < 6; j++) {
+    std::cout << matches[j] << ", ";
+  }
+  std::cout << "\n";
+  
   for (unsigned i = 0; i < marker_hues_.size(); i++) {
     int hue = marker_hues_[i];
     sprintf(buf, "  M%d-%c (%3d): ", i, hueToColor(hue), hue);
     std::cout << buf;
     if (matches[i] != -1) {
-      sprintf(buf, "B%d (%3d)", matches[i], blob_hues_[matches[i]]);
+      sprintf(buf, "B%02d (%3d)", matches[i], blob_hues_[matches[i]]);
       std::cout << buf;
     }
     std::cout << "\n";
   }
-  /*for (unsigned i = 0; i < correspondences_.rows(); i++) { 
-    unsigned m_idx = correspondences_(i,0)-1;
-    unsigned b_idx = correspondences_(i,1)-1;
-    std::cout << "M" << m_idx << " (";
-    if (m_idx >= 0 && m_idx < marker_hues_.size()) {
-      std::cout << marker_hues_[m_idx];
-    }
-    std::cout << ") - B" << b_idx << " (";
-    if (b_idx >= 0 && b_idx < blob_hues_.size()) {
-      std::cout << blob_hues_[b_idx];
-    }
-    std::cout << ")\n";
-  }*/
 }
 
 void PoseEstimator::calculateImageVectors()
@@ -458,11 +449,16 @@ void PoseEstimator::findCorrespondences()
   correspondences_ = temp_corrs;
 }
 
-unsigned PoseEstimator::checkCorrespondences()
+unsigned PoseEstimator::checkCorrespondences() {
+  double ratio;
+  checkCorrespondences(ratio);
+}
+
+unsigned PoseEstimator::checkCorrespondences(double &ratio)
 {
   bool valid_correspondences = 0;
   unsigned num_valid_correspondences = 0;
-
+  ratio = -1.0;
   // The unit image vectors from the camera out to the object points are already set when the image points are set in PoseEstimator::setImagePoints()
   ROS_INFO("Check Correspondences");
   printCorrespondences();
@@ -591,7 +587,8 @@ unsigned PoseEstimator::checkCorrespondences()
 
     }
 
-    if ((double)num_valid_correspondences / N >= valid_correspondence_threshold_)
+    ratio = (double) num_valid_correspondences / N ;
+    if (ratio >= valid_correspondence_threshold_)
     {
       valid_correspondences = 1;
       mean_reprojected_object_points = mean_reprojected_object_points / num_valid_correspondences;
@@ -790,14 +787,18 @@ unsigned PoseEstimator::initialise()
 
 }
 
+/*void hueCombinations(unsigned start_idx, std::vector<std::vector<int> > & hue_comb) {
+  if start_idx = correspondences_.rows() return;
+  tail_comb
+  for
+}*/
+
 unsigned PoseEstimator::initialiseWithHues() {
   //greedily assign correspondences to closest expected hue match
-  VectorXuPairs correspondences(blob_hues_.size(), 2);
-  std::vector<bool> used_marker;
+  std::vector<std::vector<int> > marker_matches(marker_hues_.size(), std::vector<int>());
   
-  //ROS_INFO("Initialize with Hues");
+  ROS_INFO("Initialize with Hues");
   
-  for (unsigned ii = 0; ii < marker_hues_.size(); ii++) used_marker.push_back(false);
   unsigned num_correspondences = 0;
   unsigned min_idx;
   double min_diff, diff;
@@ -817,25 +818,97 @@ unsigned PoseEstimator::initialiseWithHues() {
     }
 
     //std::cout << blob_idx << "(" << blob_hues_[blob_idx] << ") - " << min_idx << 
-    // " (" << marker_hues_[min_idx] << ") : " << min_diff << "\n";
+    //  " (" << marker_hues_[min_idx] << ") : " << min_diff << "\n";
+    
+    if (min_diff < 15.0) {
+      // Increment number of correspondences if this is the first blob assigned to this marker
+      if (marker_matches[min_idx].size() == 0) {
+        num_correspondences++;
+      }
+      marker_matches[min_idx].push_back(blob_idx);
+    }
 
     // Base one counting of entries, since an entry of 0 shows no correspondence.
-    if (!used_marker[min_idx]) {
+    /*if (!used_marker[min_idx]) {
       correspondences(num_correspondences, 0) = min_idx + 1;
       correspondences(num_correspondences, 1) = blob_idx + 1;
-      used_marker[min_idx] = true;
+      //used_marker[min_idx] = true;
       num_correspondences++;
+    }*/
+  }
+  
+  for (unsigned m_idx = 0; m_idx < marker_matches.size(); m_idx++) {
+    std::cout << "M" << m_idx << " -";
+    for (unsigned b_idx = 0; b_idx < marker_matches[m_idx].size(); b_idx++) {
+      std::cout << " B" << marker_matches[m_idx][b_idx] << "(" << blob_hues_[marker_matches[m_idx][b_idx]] << "),";
+    }
+    std::cout << "\n";
+  }
+  
+  unsigned n_checks = 0;
+
+  std::vector<int> c_idxs(marker_matches.size(),-1);
+  for (unsigned ll = 0; ll < marker_matches.size(); ll++) {
+    if (marker_matches[ll].size() > 0) {
+      c_idxs[ll] = 0;
+      if (n_checks == 0) {
+        n_checks = marker_matches[ll].size();
+      } else {
+        n_checks *= marker_matches[ll].size();
+      }
     }
   }
+ 
+  std::vector<VectorXuPairs> solutions;
+  std::cout << "Results:";
 
-  correspondences.conservativeResize(num_correspondences, 2);
+  for (unsigned check_number = 0; check_number < n_checks; check_number++) {
+    VectorXuPairs correspondences(blob_hues_.size(), 2);
+    correspondences.conservativeResize(num_correspondences, 2);
+    
+    unsigned c_i = 0;
+    
+    //std::cout << "\nCheck#" << check_number << "\n";
+    
+    for (unsigned kk = 0; kk < c_idxs.size(); kk++) {
+      //std::cout << c_idxs[kk] << ", ";
+      if (c_idxs[kk] != -1) {
+        correspondences(c_i,0) = kk + 1; 
+        correspondences(c_i,1) = marker_matches[kk][c_idxs[kk]] + 1;
+        c_i++;
+      }
+    }
+    
+    correspondences_ = correspondences;
+    double ratio;
+    unsigned result = checkCorrespondences(ratio);
+    //std::cout << "Result:" << result << "\n";
+    std::cout << ratio << "-" << result << ", ";
+    if (result == 1) {
+      solutions.push_back(correspondences);
+    }
 
-  correspondences_ = correspondences;
-  //printCorrespondences();
-  if (checkCorrespondences() == 1) {
-    return 1; // Found a solution
+    for (unsigned mm = 0; mm < c_idxs.size(); mm++) {
+      if (c_idxs[mm] != -1) {
+        if (c_idxs[mm] == marker_matches[mm].size() - 1) {
+          c_idxs[mm] = 0;
+        } else {
+          c_idxs[mm]++;
+          break;
+        }
+      }
+    }
+  } 
+  
+  std::cout << "\n";
+
+  ROS_INFO("Done with Init Hues");
+
+  if (solutions.size() > 0) {
+    correspondences_ = solutions.front();
+    return 1;
   } else {
-    return 0; // Failed to find a solution
+    return 0;
   }
 }
 
