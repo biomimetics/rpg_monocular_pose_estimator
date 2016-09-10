@@ -797,7 +797,7 @@ unsigned PoseEstimator::initialiseWithHues() {
   //greedily assign correspondences to closest expected hue match
   std::vector<std::vector<int> > marker_matches(marker_hues_.size(), std::vector<int>());
   
-  ROS_INFO("Initialize with Hues");
+  //ROS_INFO("Initialize with Hues");
   
   unsigned num_correspondences = 0;
   unsigned min_idx;
@@ -837,13 +837,13 @@ unsigned PoseEstimator::initialiseWithHues() {
     }*/
   }
   
-  for (unsigned m_idx = 0; m_idx < marker_matches.size(); m_idx++) {
+  /*for (unsigned m_idx = 0; m_idx < marker_matches.size(); m_idx++) {
     std::cout << "M" << m_idx << " -";
     for (unsigned b_idx = 0; b_idx < marker_matches[m_idx].size(); b_idx++) {
       std::cout << " B" << marker_matches[m_idx][b_idx] << "(" << blob_hues_[marker_matches[m_idx][b_idx]] << "),";
     }
     std::cout << "\n";
-  }
+  }*/
   
   unsigned n_checks = 0;
 
@@ -860,7 +860,7 @@ unsigned PoseEstimator::initialiseWithHues() {
   }
  
   std::vector<VectorXuPairs> solutions;
-  std::cout << "Results:";
+  //std::cout << "Results:";
 
   for (unsigned check_number = 0; check_number < n_checks; check_number++) {
     VectorXuPairs correspondences(blob_hues_.size(), 2);
@@ -900,9 +900,9 @@ unsigned PoseEstimator::initialiseWithHues() {
     }
   } 
   
-  std::cout << "\n";
+  //std::cout << "\n";
 
-  ROS_INFO("Done with Init Hues");
+  //ROS_INFO("Done with Init Hues");
 
   if (solutions.size() > 0) {
     correspondences_ = solutions.front();
