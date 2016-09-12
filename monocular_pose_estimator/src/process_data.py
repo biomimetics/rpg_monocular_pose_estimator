@@ -1,11 +1,14 @@
 #!/usr/bin/python
 
 import numpy.lib.recfunctions as rfn
+import numpy.linalg
+
 from load_csv_data import *
 import sys
 from tf.transformations import *
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 data_series = ['x_axis','y_axis','z_axis','r_angle','p_angle','q_angle']
 series_titles = {'x':'X','y':'Y','z':'Z','r':'Roll','p':'Pitch','q':'Yaw'}
@@ -117,6 +120,83 @@ def plot_series_box(data, series_name, title):
   plt.gcf().subplots_adjust(bottom=0.15)
   plt.ylabel('Angle Error (deg.)')
   
+  plt.show()
+
+# Homogeneous points representing coordinate axes
+axes_pts = 1.0*numpy.array([
+  [0,1,0,0,0,0],
+  [0,0,0,1,0,0],
+  [0,0,0,0,0,1],
+  [1,1,1,1,1,1]
+])
+
+def plot_trajectory(data, series_name, start=0, end=-1, axes_scale=0.03):
+  series = data[series_name][start:end]
+  series = transform_from_start(series)
+  
+  fig = plt.figure()
+  ax = fig.add_subplot(111, projection='3d')
+  ax.plot(series['x'], series['y'], series['z'], color='k')
+  ax.plot([series['x'][0]], [series['y'][0]], [series['z'][0]], 'yo',label='Start',markersize=15)
+  ax.plot([series['x'][-1]], [series['y'][-1]], [series['z'][-1]], 'y*',label='End',markersize=15)
+  
+  n_points = len(series)
+  t_step = n_points/30
+  for t_i in range(0,n_points,t_step):
+    R = quaternion_matrix(list(series[['qx','qy','qz','qw']][t_i]))
+    T = translation_matrix(list(series[['x','y','z']][t_i]))
+    S = scale_matrix(axes_scale)
+    pts = T.dot(R).dot(S).dot(axes_pts)
+    for i,c in zip(range(3),['r','g','b']):
+      l_pts = pts[0:3,(2*i):(2*i+2)]
+      ax.plot(l_pts[0],l_pts[1],l_pts[2],color=c,linewidth=2)
+
+  ax.set_xlabel('X (m)')
+  ax.set_ylabel('Y (m)')
+  ax.set_zlabel('Z (m)')
+  plt.axis('scaled')
+  plt.grid(True)
+  plt.legend(numpoints=1)
+  plt.title('Robot Spatial Trajectory')
+  
+  plt.show()
+
+def transform_from_start(series):
+  R0 = quaternion_matrix(list(series[['qx','qy','qz','qw']][0]))
+  T0 = translation_matrix(list(series[['x','y','z']][0]))
+  H0_inv = numpy.linalg.inv(T0.dot(R0))
+  series_tf = series.copy()
+  for i in range(len(series)):
+    Rt = quaternion_matrix(list(series[['qx','qy','qz','qw']][i]))
+    Tt = translation_matrix(list(series[['x','y','z']][i]))
+    Ht = H0_inv.dot(Tt.dot(Rt))
+    pose = list(Ht[:3,3]) + list(quaternion_from_matrix(Ht))
+    for s,v in zip(['x','y','z','qx','qy','qz','qw'],pose):
+      series_tf[i][s] = v
+  return series_tf
+
+def plot_time_trajectory(data, series_name, start=0, end=-1):
+  series = data[series_name][start:end]
+  series = transform_from_start(series)
+  rpq = quat_to_rpq(series)
+  tmin, tmax = series['time'][0], series['time'][-1]
+
+  ax = plt.subplot(211)
+  plt.title('Robot Temporal Trajectory') 
+  for label in ['x','y','z']:
+    plt.plot(series['time'],series[label],label=label,linewidth=2)
+  ax.set_xticklabels([])
+  plt.ylabel('Posisition (m)')
+  plt.legend()
+  plt.xlim(tmin,tmax)
+
+  plt.subplot(212)
+  for label in ['r','p','q']:
+    plt.plot(series['time'],180.0*rpq[label]/numpy.pi,label=label,linewidth=2)
+  plt.ylabel('Angle (deg.)')
+  plt.legend()
+  plt.xlabel('Time (s)')
+  plt.xlim(tmin,tmax)
   plt.show()
 
 def make_all_plots(data):
