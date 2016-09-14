@@ -132,7 +132,7 @@ axes_pts = 1.0*numpy.array([
 
 def plot_trajectory(data, series_name, start=0, end=-1, axes_scale=0.03):
   series = data[series_name][start:end]
-  series = transform_from_start(series)
+  series,_ = transform_from_start(series)
   
   fig = plt.figure()
   ax = fig.add_subplot(111, projection='3d')
@@ -161,11 +161,16 @@ def plot_trajectory(data, series_name, start=0, end=-1, axes_scale=0.03):
   
   plt.show()
 
-def transform_from_start(series):
-  R0 = quaternion_matrix(list(series[['qx','qy','qz','qw']][0]))
-  T0 = translation_matrix(list(series[['x','y','z']][0]))
-  H0_inv = numpy.linalg.inv(T0.dot(R0))
+def transform_from_start(series,idx=0,H0=None):
+  
+  if H0 is None:
+    R0 = quaternion_matrix(list(series[['qx','qy','qz','qw']][idx]))
+    T0 = translation_matrix(list(series[['x','y','z']][idx]))
+    H0 = T0.dot(R0)
+
+  H0_inv = numpy.linalg.inv(H0)
   series_tf = series.copy()
+  
   for i in range(len(series)):
     Rt = quaternion_matrix(list(series[['qx','qy','qz','qw']][i]))
     Tt = translation_matrix(list(series[['x','y','z']][i]))
@@ -173,27 +178,30 @@ def transform_from_start(series):
     pose = list(Ht[:3,3]) + list(quaternion_from_matrix(Ht))
     for s,v in zip(['x','y','z','qx','qy','qz','qw'],pose):
       series_tf[i][s] = v
-  return series_tf
+  
+  return series_tf, H0
 
-def plot_time_trajectory(data, series_name, start=0, end=-1):
+def plot_time_trajectory(data, series_name, title='Robot Temporal Trajectory', start=0, end=-1, H0=None):
   series = data[series_name][start:end]
-  series = transform_from_start(series)
+  series['time'] -= series['time'][0]
+  series,_ = transform_from_start(series,H0=H0)
   rpq = quat_to_rpq(series)
   tmin, tmax = series['time'][0], series['time'][-1]
-
+  
   ax = plt.subplot(211)
-  plt.title('Robot Temporal Trajectory') 
-  for label in ['x','y','z']:
-    plt.plot(series['time'],series[label],label=label,linewidth=2)
+  plt.title(title) 
+  for label,marker in zip(['x','y','z'],['+','.','x']):
+    plt.plot(series['time'],series[label],marker,label=label)#,linewidth=2)
   ax.set_xticklabels([])
   plt.ylabel('Posisition (m)')
   plt.legend()
   plt.xlim(tmin,tmax)
 
   plt.subplot(212)
-  for label in ['r','p','q']:
-    plt.plot(series['time'],180.0*rpq[label]/numpy.pi,label=label,linewidth=2)
+  for label,marker in zip(['r','p','q'],['+','.','x']):
+    plt.plot(series['time'],180.0*rpq[label]/numpy.pi,marker,label=label)#,linewidth=2)
   plt.ylabel('Angle (deg.)')
+  plt.ylim(-180.0,180.0)
   plt.legend()
   plt.xlabel('Time (s)')
   plt.xlim(tmin,tmax)

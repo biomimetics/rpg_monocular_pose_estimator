@@ -37,7 +37,8 @@ topic_formats = {
 base_topics = [
   'record/desired_pose',
   'record/estimated_pose',
-  'monocular_pose_estimator/estimated_pose'
+  'monocular_pose_estimator/estimated_pose',
+  'test/estimated_pose'
 ]
 
 def init_topics(in_filename):

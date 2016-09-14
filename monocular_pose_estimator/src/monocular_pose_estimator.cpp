@@ -195,7 +195,7 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg)
   }
   else
   { // If pose was not updated
-    //ROS_WARN("Unable to resolve a pose.");
+    ROS_WARN("Unable to resolve a pose.");
   }
 
   // publish visualization image
@@ -226,13 +226,16 @@ void MPENode::dynamicParametersCallback(monocular_pose_estimator::MonocularPoseE
   trackable_object_.max_width_height_distortion_ = config.max_width_height_distortion;
   trackable_object_.max_circular_distortion_ = config.max_circular_distortion;
   trackable_object_.roi_border_thickness_ = config.roi_border_thickness;
+  trackable_object_.use_color_ = config.use_color;
 
   trackable_object_.setBackProjectionPixelTolerance(config.back_projection_pixel_tolerance);
   trackable_object_.setNearestNeighbourPixelTolerance(config.nearest_neighbour_pixel_tolerance);
   trackable_object_.setCertaintyThreshold(config.certainty_threshold);
   trackable_object_.setValidCorrespondenceThreshold(config.valid_correspondence_threshold);
+  
 
   ROS_INFO("Parameters changed");
+  ROS_INFO("Use Color:%d",config.use_color);
 }
 
 } // namespace monocular_pose_estimator

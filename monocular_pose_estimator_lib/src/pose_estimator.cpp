@@ -44,6 +44,14 @@ PoseEstimator::PoseEstimator()
 
 void PoseEstimator::augmentImage(cv::Mat &image, const bool found_body_pose)
 {
+  ROS_INFO("Augment Image");
+  if (!use_color_) {
+    blob_hues_.clear();
+    for (unsigned i = 0; i < distorted_detection_centers_.size(); i++) {
+      blob_hues_.push_back(0);
+    }
+  }
+  ROS_INFO("Create visualization image");
   Visualization::createVisualizationImage(image, found_body_pose, 
     predicted_pose_, camera_matrix_K_, camera_distortion_coeffs_,
     region_of_interest_, distorted_detection_centers_, blob_hues_);
@@ -86,7 +94,7 @@ bool PoseEstimator::estimateBodyPose(cv::Mat image, double time_to_predict)
   // Set up pixel positions list
   List2DPoints detected_led_positions;
   
-  //ROS_INFO("Estimating Pose");
+  ROS_INFO("Estimating Pose");
 
   if (it_since_initialized_ < 1)  // If not yet initialised, search the whole image for the points
   {
@@ -100,18 +108,21 @@ bool PoseEstimator::estimateBodyPose(cv::Mat image, double time_to_predict)
     if (detected_led_positions.size() >= min_num_leds_detected_) // If found enough LEDs, Reinitialise
     {
       // Reinitialise
-      //ROS_WARN("Initialising using brute-force correspondence search.");
+      ROS_WARN("Initialising using brute-force correspondence search.");
 
       setImagePoints(detected_led_positions);
-
-      //if (initialise() == 1)
-      if (initialiseWithHues() == 1)
+      
+      unsigned init_result = use_color_ ? initialiseWithHues() : initialise();
+      if (init_result == 1)
       {
         optimiseAndUpdatePose(time_to_predict);
+      } else {
+        ROS_INFO("Pose not updates");
       }
     }
     else
     { // Too few LEDs found
+      ROS_WARN("Initialising found too few LEDs");
     }
 
   }
@@ -140,7 +151,7 @@ bool PoseEstimator::estimateBodyPose(cv::Mat image, double time_to_predict)
         if (num_loops < 2)
         { // If haven't searched image yet, search image
 
-          //ROS_WARN("Too few LEDs detected in ROI. Searching whole image. Num LEDs detected: %d.", (int)detected_led_positions.size());
+          ROS_WARN("Too few LEDs detected in ROI. Searching whole image. Num LEDs detected: %d.", (int)detected_led_positions.size());
 
           // Search whole image
           region_of_interest_ = cv::Rect(0, 0, image.cols, image.rows);
@@ -152,12 +163,13 @@ bool PoseEstimator::estimateBodyPose(cv::Mat image, double time_to_predict)
         else
         { // If already searched image continue
           repeat_check = false;
-          //ROS_WARN("Too few LEDs detected. Num LEDs detected: %d.", (int)detected_led_positions.size());
+          ROS_WARN("Too few LEDs detected. Num LEDs detected: %d.", (int)detected_led_positions.size());
         }
       }
     } while (repeat_check);
   }
-
+  
+  ROS_INFO("Estimate pose done");
   return pose_updated_;
 }
 
@@ -337,19 +349,6 @@ void PoseEstimator::printCorrespondences() {
     }
     std::cout << "\n";
   }
-  /*for (unsigned i = 0; i < correspondences_.rows(); i++) { 
-    unsigned m_idx = correspondences_(i,0)-1;
-    unsigned b_idx = correspondences_(i,1)-1;
-    std::cout << "M" << m_idx << " (";
-    if (m_idx >= 0 && m_idx < marker_hues_.size()) {
-      std::cout << marker_hues_[m_idx];
-    }
-    std::cout << ") - B" << b_idx << " (";
-    if (b_idx >= 0 && b_idx < blob_hues_.size()) {
-      std::cout << blob_hues_[b_idx];
-    }
-    std::cout << ")\n";
-  }*/
 }
 
 void PoseEstimator::calculateImageVectors()
@@ -415,6 +414,8 @@ VectorXuPairs PoseEstimator::correspondencesFromHistogram(MatrixXYu & histogram)
   unsigned num_correspondences = 0;
   unsigned max_value;
   unsigned row_idx, col_idx;
+  
+  ROS_INFO("Correspondences from histogram");
 
   //for (unsigned j = 0; j < std::min(histogram.rows(), histogram.cols()); ++j)
   for (unsigned j = 0; j < histogram.cols(); ++j)
@@ -432,6 +433,7 @@ VectorXuPairs PoseEstimator::correspondencesFromHistogram(MatrixXYu & histogram)
   }
 
   correspondences.conservativeResize(num_correspondences, 2);
+  ROS_INFO("Correspondences from histogram done");
 
   return correspondences;
 }
@@ -464,11 +466,14 @@ unsigned PoseEstimator::checkCorrespondences()
   unsigned num_valid_correspondences = 0;
 
   // The unit image vectors from the camera out to the object points are already set when the image points are set in PoseEstimator::setImagePoints()
-  //ROS_INFO("Check Correspondences");
-  printCorrespondences();
+  ROS_INFO("Check Correspondences");
+  if (use_color_) {
+    printCorrespondences();
+  }
 
   if (correspondences_.rows() < 4)
   {
+    ROS_INFO("No Valid Correspondences");
     return valid_correspondences;
   }
   else
@@ -476,11 +481,18 @@ unsigned PoseEstimator::checkCorrespondences()
     MatrixXYd mean_reprojected_object_points(4, object_points_.size());
     mean_reprojected_object_points.setZero();
 
+    ROS_INFO("Finding combinations");
+
     MatrixXYu combinations = Combinations::combinationsNoReplacement(correspondences_.rows(), 3);
+    
+    ROS_INFO("Finding combinations done");
+    
     unsigned N = combinations.rows();
 
     for (unsigned i = 0; i < N; ++i)
     {
+      ROS_INFO("Check comb %d of %d", i, N);
+
       //Declare and populate the feature vectors and world points required for the P3P algorithm
       Eigen::Matrix3d feature_vectors, world_points;
       Eigen::Matrix<Eigen::Matrix<double, 3, 4>, 4, 1> solutions;
@@ -607,13 +619,14 @@ unsigned PoseEstimator::checkCorrespondences()
 
   }
 
-  //ROS_INFO("Check Correspondences Done");
+  ROS_INFO("Check Correspondences Done");
   return valid_correspondences;
 }
 
 unsigned PoseEstimator::initialise()
 {
   // Combinations of seen points
+  ROS_INFO("Initialize");
   RowXu seen_points_working_vector;
   seen_points_working_vector.setLinSpaced(image_points_.size(), 1, image_points_.size());
   MatrixXYu seen_points_combinations = Combinations::combinationsNoReplacement(seen_points_working_vector, 3);
@@ -634,7 +647,7 @@ unsigned PoseEstimator::initialise()
   // the possible permutations of 3 object points.
   for (unsigned i = 0; i < num_seen_points_combinations; ++i)
   {
-
+    ROS_INFO("Combination %d of %d",i,num_seen_points_combinations);
     Eigen::Matrix<Eigen::Matrix<double, 3, 4>, 4, 1> solutions;
 
     // Build up matrix of unit feature vectors
@@ -770,9 +783,12 @@ unsigned PoseEstimator::initialise()
 
     }
   }
+  
+  ROS_INFO("Finished combinations");
 
   if (!(hist_corr.array() == 0).all())
   {
+    ROS_INFO("Checking initial histogram correspondences");
     correspondences_ = correspondencesFromHistogram(hist_corr);
     if (checkCorrespondences() == 1)
     {
@@ -795,7 +811,7 @@ unsigned PoseEstimator::initialiseWithHues() {
   VectorXuPairs correspondences(blob_hues_.size(), 2);
   std::vector<bool> used_marker;
   
-  //ROS_INFO("Initialize with Hues");
+  ROS_INFO("Initialize with Hues");
   
   for (unsigned ii = 0; ii < marker_hues_.size(); ii++) used_marker.push_back(false);
   unsigned num_correspondences = 0;
@@ -957,9 +973,8 @@ void PoseEstimator::findCorrespondencesAndPredictPose(double & time_to_predict)
   }
   else
   { // Reinitialise if the correspondences weren't correct
-
-    //if (initialise() == 1)
-    if (initialiseWithHues() == 1)
+    unsigned init_result = use_color_ ? initialiseWithHues() : initialise();
+    if (init_result)
     { // Only update pose if the initialisation found a valid pose.
       optimiseAndUpdatePose(time_to_predict);
     }

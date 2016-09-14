@@ -1,14 +1,15 @@
 <launch> 
-
+  <arg name="use_color" default="1" />
 	<!-- Name of the YAML file containing the marker positions -->
 	<arg name="YAML_file_name" default="hippocampus_marker_positions_fit"/>
 
 	<!-- File containing the the marker positions in the trackable's frame of reference -->
 	<arg name="marker_positions_file" default="$(find monocular_pose_estimator)/marker_positions/$(arg YAML_file_name).yaml"/> 
 
-	<group ns="monocular_pose_estimator" >
+	<group ns="test" >
 		<node name="monocular_pose_estimator" pkg="monocular_pose_estimator" type="monocular_pose_estimator" respawn="false" output="screen"> 
 			<rosparam command="load" file="$(arg marker_positions_file)"/>
+      <param name= "use_color" value = "$(arg use_color)" />
 			<param name= "threshold_value" value = "64" />
 			<param name= "gaussian_sigma" value = "0.6" />
 			<param name= "min_blob_area" value = "9" />
@@ -24,7 +25,7 @@
       <remap from="/camera/image_raw" to="/usb_cam/image_raw" />
 		</node>
 	
-		<node name="view_visualisation_image" pkg="image_view" type="image_view" args="image:=/monocular_pose_estimator/image_with_detections" />
+		<node name="view_visualisation_image" pkg="image_view" type="image_view" args="image:=image_with_detections" />
 	</group>
 
 	<!-- rosbag play -->

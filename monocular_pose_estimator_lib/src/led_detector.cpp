@@ -195,8 +195,11 @@ void LEDDetector::findLeds(const cv::Mat &image, cv::Rect ROI, const int &thresh
 {
   // Threshold the image
   cv::Mat bw_image;
+  cv::Mat gray_image;
+  ROS_INFO("Converting to gray");
+  cv::cvtColor(image(ROI), gray_image, cv::COLOR_BGR2GRAY);
   //cv::threshold(image, bwImage, threshold_value, 255, cv::THRESH_BINARY);
-  cv::threshold(image(ROI), bw_image, threshold_value, 255, cv::THRESH_TOZERO);
+  cv::threshold(gray_image, bw_image, threshold_value, 255, cv::THRESH_TOZERO);
 
   // Gaussian blur the image
   cv::Mat gaussian_image;
@@ -264,6 +267,7 @@ void LEDDetector::findLeds(const cv::Mat &image, cv::Rect ROI, const int &thresh
       pixel_positions(j) = point;
     }
   }
+  ROS_INFO("Find LEDs Done");
 }
 
 cv::Rect LEDDetector::determineROI(List2DPoints pixel_positions, cv::Size image_size, const int border_size,
