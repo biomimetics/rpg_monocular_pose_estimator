@@ -26,14 +26,16 @@ def quat_to_rpq(data):
 
 def get_series(data, series_name):
   desired = data['calibration_%s_record_desired_pose' % series_name]
+  desired,_ = transform_from_start(desired)
   d_i = time_cluster(desired)
   desired = desired[numpy.hstack([numpy.diff(d_i)>0,[True]])]
   desired = rfn.merge_arrays([desired,quat_to_rpq(desired)],flatten=True)
   estimated = data['calibration_%s_record_estimated_pose' % series_name]
+  estimated,_ = transform_from_start(estimated)
   e_i = time_cluster(estimated)
   return desired, estimated, e_i
   
-def series_error(desired, estimated, e_i, flip_roll=False, euler=True):
+def series_error(desired, estimated, e_i, flip_roll=False, euler=True, flip_quat=False):
   res = numpy.zeros(len(estimated),dtype=[('x', '<f8'), ('y', '<f8'), ('z', '<f8'), ('r', '<f8'), ('p', '<f8'), ('q', '<f8')])
   for s in ['x','y','z']:
     res[s] = estimated[s] - desired[s][e_i]
@@ -74,11 +76,25 @@ def pos_angle_error(axis_error):
   
   return pos,angle
 
-def process_data(data):
-  series = []
-  for ds in data_series:
-    series.append(series_error(*get_series(data,ds)))
-  return series
+def transform_from_start(series,idx=0,H0=None):
+  
+  if H0 is None:
+    R0 = quaternion_matrix(list(series[['qx','qy','qz','qw']][idx]))
+    T0 = translation_matrix(list(series[['x','y','z']][idx]))
+    H0 = T0.dot(R0)
+
+  H0_inv = numpy.linalg.inv(H0)
+  series_tf = series.copy()
+  
+  for i in range(len(series)):
+    Rt = quaternion_matrix(list(series[['qx','qy','qz','qw']][i]))
+    Tt = translation_matrix(list(series[['x','y','z']][i]))
+    Ht = H0_inv.dot(Tt.dot(Rt))
+    pose = list(Ht[:3,3]) + list(quaternion_from_matrix(Ht))
+    for s,v in zip(['x','y','z','qx','qy','qz','qw'],pose):
+      series_tf[i][s] = v
+  
+  return series_tf, H0
 
 def plot_series(data):  
   for s in data.dtype.names:
@@ -87,40 +103,49 @@ def plot_series(data):
   plt.grid(True)
   plt.show()
 
-def plot_series_box(data, series_name, title):
+def reject_outliers(data, m=4.0):
+  data = numpy.array(data)
+  return data[abs(data - data.mean()) < m * data.std()]
+
+def plot_series_box(data, series_name, title, euler=True):
+  fig = plt.figure(title.replace(' ','_').lower(),(8,6))
   desired, estimated, e_i = get_series(data,series_name)
   series_label = series_name[0]
 
   pos, angle = pos_angle_error(series_error(
-    desired, estimated, e_i, flip_roll = series_label == 'r'
+    desired, estimated, e_i, flip_roll = series_label == 'r', euler=euler
   ))
-  pos_samps = [pos[e_i==i] for i in range(max(e_i))]
-  angle_samps = [angle[e_i==i] for i in range(max(e_i))]
+  
+  pos_samps = [reject_outliers(pos[e_i==i]) for i in range(max(e_i))]
+
+  angle_samps = [reject_outliers(angle[e_i==i]) for i in range(max(e_i))]
   
   plt.subplot(211)
-  plt.boxplot(pos_samps)
+  plt.boxplot(pos_samps,sym='')
   ax = plt.gca()
   ax.set_xticklabels([])
   plt.ylabel('Position Error (m)')
   plt.title(title)
+  #plt.ylim([0.0,0.51])
 
   plt.subplot(212)
-  plt.boxplot(angle_samps)
+  plt.boxplot(angle_samps,sym='')
+  #plt.ylim([0.0,61.0])
   ax = plt.gca()
   
   if series_label in ['x','y','z']:
-    x_labels = ['%0.2f' % v for v in desired[series_label]]
-    plt.xlabel('%s Position (m)' % series_titles[series_label])
+    #x_labels = ['%0.2f' % abs(v) for v in desired[series_label]]
+    x_labels = ['%0.2f' % (i * 0.05) for i in range(len(desired[series_label]))]
+    plt.xlabel('%s Difference (m)' % title.split()[0])
   else:
-    x_labels = ['%d' % int(180.0*v/numpy.pi) for v in desired[series_label]]
-    plt.xlabel('%s Angle (deg.)' % series_titles[series_label])
+    #x_labels = ['%d' % int(180.0*v/numpy.pi) for v in desired[series_label]]
+    x_labels = ['%d' % (i * 20) for i in range(len(desired[series_label]))]
+    plt.xlabel('%s Difference (deg)' % title.split()[0])
     
   ax.set_xticklabels(x_labels)
   plt.xticks(rotation='vertical')
   plt.gcf().subplots_adjust(bottom=0.15)
-  plt.ylabel('Angle Error (deg.)')
-  
-  plt.show()
+  plt.ylabel('Angle Error (deg)')
 
 # Homogeneous points representing coordinate axes
 axes_pts = 1.0*numpy.array([
@@ -130,11 +155,12 @@ axes_pts = 1.0*numpy.array([
   [1,1,1,1,1,1]
 ])
 
-def plot_trajectory(data, series_name, start=0, end=-1, axes_scale=0.03):
+def plot_trajectory(data, series_name, title='Estimated Trajectory', start=0, end=-1, axes_scale=0.03):
   series = data[series_name][start:end]
   series,_ = transform_from_start(series)
   
-  fig = plt.figure()
+  fig = plt.figure(title.replace(' ','_').lower(),(8,6))
+  
   ax = fig.add_subplot(111, projection='3d')
   ax.plot(series['x'], series['y'], series['z'], color='k')
   ax.plot([series['x'][0]], [series['y'][0]], [series['z'][0]], 'yo',label='Start',markersize=15)
@@ -157,29 +183,7 @@ def plot_trajectory(data, series_name, start=0, end=-1, axes_scale=0.03):
   plt.axis('scaled')
   plt.grid(True)
   plt.legend(numpoints=1)
-  plt.title('Robot Spatial Trajectory')
-  
-  plt.show()
-
-def transform_from_start(series,idx=0,H0=None):
-  
-  if H0 is None:
-    R0 = quaternion_matrix(list(series[['qx','qy','qz','qw']][idx]))
-    T0 = translation_matrix(list(series[['x','y','z']][idx]))
-    H0 = T0.dot(R0)
-
-  H0_inv = numpy.linalg.inv(H0)
-  series_tf = series.copy()
-  
-  for i in range(len(series)):
-    Rt = quaternion_matrix(list(series[['qx','qy','qz','qw']][i]))
-    Tt = translation_matrix(list(series[['x','y','z']][i]))
-    Ht = H0_inv.dot(Tt.dot(Rt))
-    pose = list(Ht[:3,3]) + list(quaternion_from_matrix(Ht))
-    for s,v in zip(['x','y','z','qx','qy','qz','qw'],pose):
-      series_tf[i][s] = v
-  
-  return series_tf, H0
+  plt.title(title)
 
 def plot_time_trajectory(data, series_name, title='Robot Temporal Trajectory', start=0, end=-1, H0=None):
   series = data[series_name][start:end]
@@ -188,33 +192,53 @@ def plot_time_trajectory(data, series_name, title='Robot Temporal Trajectory', s
   rpq = quat_to_rpq(series)
   tmin, tmax = series['time'][0], series['time'][-1]
   
+  fig = plt.figure(title.replace(' ','_').lower(),(8,6))
   ax = plt.subplot(211)
   plt.title(title) 
-  for label,marker in zip(['x','y','z'],['+','.','x']):
-    plt.plot(series['time'],series[label],marker,label=label)#,linewidth=2)
+  for field,marker,label in zip(['x','y','z'],['r+','gx','b.'],['X','Y','Z']):
+    plt.plot(series['time'],series[field],marker,label=label)
   ax.set_xticklabels([])
   plt.ylabel('Posisition (m)')
-  plt.legend()
+  plt.legend(numpoints=1)
   plt.xlim(tmin,tmax)
 
   plt.subplot(212)
-  for label,marker in zip(['r','p','q'],['+','.','x']):
-    plt.plot(series['time'],180.0*rpq[label]/numpy.pi,marker,label=label)#,linewidth=2)
-  plt.ylabel('Angle (deg.)')
+  for field,marker,label in zip(['r','p','q'],['r+','gx','b.'],['Roll','Pitch','Yaw']):
+    plt.plot(series['time'],180.0*rpq[field]/numpy.pi,marker,label=label)
+  plt.ylabel('Angle (deg)')
   plt.ylim(-180.0,180.0)
-  plt.legend()
+  plt.legend(numpoints=1)
   plt.xlabel('Time (s)')
   plt.xlim(tmin,tmax)
-  plt.show()
+
+def make_box_plots(data):
+  # Swap camera frames with robot frames (so that 'Yaw' plot is robot yaw)
+  plot_series_box(data,'x_axis','X Sweep Errors')
+  plot_series_box(data,'z_axis','Y Sweep Errors')
+  plot_series_box(data,'y_axis','Z Sweep Errors')
+  plot_series_box(data,'r_angle','Roll Sweep Errors')
+  plot_series_box(data,'q_angle','Pitch Sweep Errors')
+  plot_series_box(data,'p_angle','Yaw Sweep Errors',False)
+
+def make_trajectory_plots(data):
+  H0 = transform_from_start(data['test_test_estimated_pose'])[1]
+  plot_time_trajectory(data,'test_test_estimated_pose','Trajectory Estimate with Hue Information')
+  plot_time_trajectory(data,'test2_test_estimated_pose','Trajectory Estimate without Hue Information',H0=H0)
 
 def make_all_plots(data):
-  plot_series_box(data,'x_axis','X Axis Errors')
-  plot_series_box(data,'y_axis','Y Axis Errors')
-  plot_series_box(data,'z_axis','Z Axis Errors')
-  plot_series_box(data,'r_angle','Roll Angle Errors')
-  plot_series_box(data,'p_angle','Pitch Angle Errors')
-  plot_series_box(data,'q_angle','Yaw Angle Errors')
-  
+  make_box_plots(data)
+  make_trajectory_plots(data)
+
+def show_all_plots(data):
+  make_all_plots(data)
+  plt.show()
+
+def save_all_plots(data, outdir='.'):
+  make_all_plots(data)
+  for fignum in plt.get_fignums():
+    fig = plt.figure(fignum)
+    fig.savefig(outdir + '/' + fig.get_label() + '.pdf')
+    
 if __name__ == '__main__':
   data = load_csv_data(sys.argv[1])
-  make_all_plots(data)
+  save_all_plots(data,sys.argv[2])
