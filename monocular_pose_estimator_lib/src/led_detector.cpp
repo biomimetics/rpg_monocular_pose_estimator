@@ -81,8 +81,8 @@ void LEDDetector::findColorLeds(const cv::Mat &image, cv::Rect ROI,
     cv::Scalar mean, stddev;
     cv::meanStdDev(hue_region, mean, stddev, region_mask);
     
-    if (stddev.val[0] > 16.0) {
-      //ROS_INFO("Splitting blob at %d %d %f", bounding_rect.x, bounding_rect.y, stddev.val[0]);
+    if (stddev.val[0] > 10.0) {
+      ROS_INFO("Splitting blob at %d %d %f", bounding_rect.x, bounding_rect.y, stddev.val[0]);
       //std::cout << hue_region;
       cv::Mat hue_mask, split_mask;
       std::vector<std::vector<cv::Point> > split_contours_high, split_contours_low;
@@ -96,7 +96,7 @@ void LEDDetector::findColorLeds(const cv::Mat &image, cv::Rect ROI,
         bounding_rects.push_back(cv::boundingRect(split_contours_high[0]));
         cv::meanStdDev(hue_region, mean, stddev, split_mask);
         init_blob_hues.push_back((int)mean.val[0]);
-        //ROS_INFO("New rect high %d %d %d", bounding_rects.back().x, bounding_rects.back().y, init_blob_hues.back());
+        ROS_INFO("New rect high %d %d %d", bounding_rects.back().x, bounding_rects.back().y, init_blob_hues.back());
       }
      
       cv::Mat flip_hue_mask, flip_split_mask;
@@ -108,7 +108,7 @@ void LEDDetector::findColorLeds(const cv::Mat &image, cv::Rect ROI,
         bounding_rects.push_back(cv::boundingRect(split_contours_low[0]));
         cv::meanStdDev(hue_region, mean, stddev, flip_split_mask);
         init_blob_hues.push_back((int)mean.val[0]);
-        //ROS_INFO("New rect low %d %d %d", bounding_rects.back().x, bounding_rects.back().y, init_blob_hues.back());
+        ROS_INFO("New rect low %d %d %d", bounding_rects.back().x, bounding_rects.back().y, init_blob_hues.back());
       }
     } else {
       contours.push_back(init_contours[i]);

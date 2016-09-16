@@ -86,7 +86,7 @@ MPENode::MPENode(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private)
   }
   trackable_object_.setMarkerPositions(positions_of_markers_on_object);
   trackable_object_.setMarkerHues(marker_hues);
-  ROS_INFO("The number of markers on the object are: %d", (int )positions_of_markers_on_object.size());
+  //ROS_INFO("The number of markers on the object are: %d", (int )positions_of_markers_on_object.size());
 }
 
 /**
@@ -124,7 +124,7 @@ void MPENode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg)
     trackable_object_.camera_distortion_coeffs_ = cam_info_.D;
 
     have_camera_info_ = true;
-    ROS_INFO("Camera calibration information obtained.");
+    //ROS_INFO("Camera calibration information obtained.");
   }
 
 }
@@ -234,8 +234,8 @@ void MPENode::dynamicParametersCallback(monocular_pose_estimator::MonocularPoseE
   trackable_object_.setValidCorrespondenceThreshold(config.valid_correspondence_threshold);
   
 
-  ROS_INFO("Parameters changed");
-  ROS_INFO("Use Color:%d",config.use_color);
+  //ROS_INFO("Parameters changed");
+  //ROS_INFO("Use Color:%d",config.use_color);
 }
 
 } // namespace monocular_pose_estimator

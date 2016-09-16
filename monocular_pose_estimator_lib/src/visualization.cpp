@@ -61,7 +61,7 @@ void Visualization::createVisualizationImage(cv::Mat &image, const bool found_bo
                                              cv::Rect region_of_interest,
                                              std::vector<cv::Point2f> distorted_detection_centers, std::vector<int> blob_hues)
 {
-  ROS_INFO("Augmenting Image");
+  //ROS_INFO("Augmenting Image");
   if (found_body_pose) {
     //!< Length of the orientation trivectors that will be projected onto the output image
     const double orientation_vector_length = 0.1; 

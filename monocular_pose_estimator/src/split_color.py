@@ -28,7 +28,7 @@ def image_callback(img_msg):
     svt_img = numpy.zeros((h,w),dtype=numpy.uint8)
     #svt_img[:] = (s_img ** 0.5) * (v_img ** 0.5)
     svt_img[:] = v_img
-    _,svt_img = cv2.threshold(svt_img,64,255,cv2.THRESH_TOZERO)
+    _,svt_img = cv2.threshold(svt_img,20,255,cv2.THRESH_TOZERO)
     out_img[h:(2*h),w:(2*w)] = svt_img
     out_msg = bridge.cv2_to_imgmsg(out_img, 'mono8')
     image_pub.publish(out_msg)

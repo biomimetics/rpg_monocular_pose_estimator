@@ -155,32 +155,42 @@ axes_pts = 1.0*numpy.array([
   [1,1,1,1,1,1]
 ])
 
-def plot_trajectory(data, series_name, title='Estimated Trajectory', start=0, end=-1, axes_scale=0.03):
+def plot_trajectory(data, series_name, title='Estimated Trajectory', start=0, end=-1, axes_scale=0.03,n_axes=3):
   series = data[series_name][start:end]
   series,_ = transform_from_start(series)
   
-  fig = plt.figure(title.replace(' ','_').lower(),(8,6))
+  fig = plt.figure(title.replace(' ','_').lower(),(8,8))
   
   ax = fig.add_subplot(111, projection='3d')
-  ax.plot(series['x'], series['y'], series['z'], color='k')
-  ax.plot([series['x'][0]], [series['y'][0]], [series['z'][0]], 'yo',label='Start',markersize=15)
-  ax.plot([series['x'][-1]], [series['y'][-1]], [series['z'][-1]], 'y*',label='End',markersize=15)
+  
+  ax.plot([series['x'][0]], [series['y'][0]], [series['z'][0]], 'yo',label='Start',markersize=10)
+  ax.plot([series['x'][-1]], [series['y'][-1]], [series['z'][-1]], 'y*',label='End',markersize=16)
+  
   
   n_points = len(series)
-  t_step = n_points/30
-  for t_i in range(0,n_points,t_step):
+  t_step = int(n_points/n_axes)
+  for t_i in range(0,n_points,t_step) + [-1]:
     R = quaternion_matrix(list(series[['qx','qy','qz','qw']][t_i]))
     T = translation_matrix(list(series[['x','y','z']][t_i]))
     S = scale_matrix(axes_scale)
     pts = T.dot(R).dot(S).dot(axes_pts)
     for i,c in zip(range(3),['r','g','b']):
       l_pts = pts[0:3,(2*i):(2*i+2)]
+      if i == 0:
+        ax.plot([l_pts[0,1]],[l_pts[1,1]],[l_pts[2,1]],color=c,linewidth=2,marker='D',markeredgecolor='r')
       ax.plot(l_pts[0],l_pts[1],l_pts[2],color=c,linewidth=2)
 
-  ax.set_xlabel('X (m)')
-  ax.set_ylabel('Y (m)')
+  ax.plot(series['x'], series['y'], series['z'], 'k.',markersize=3)
+  
+  ax.set_xlabel('\nX (m)      ')
+  ax.set_ylabel('\n\n     Y (m)')
   ax.set_zlabel('Z (m)')
-  plt.axis('scaled')
+  ax.view_init(11,140)
+  plt.xticks(rotation=30)
+  plt.yticks(rotation=-30)
+  #plt.axis('scaled')
+  plt.axis('equal')
+  plt.axis('tight')
   plt.grid(True)
   plt.legend(numpoints=1)
   plt.title(title)
@@ -195,16 +205,16 @@ def plot_time_trajectory(data, series_name, title='Robot Temporal Trajectory', s
   fig = plt.figure(title.replace(' ','_').lower(),(8,6))
   ax = plt.subplot(211)
   plt.title(title) 
-  for field,marker,label in zip(['x','y','z'],['r+','gx','b.'],['X','Y','Z']):
-    plt.plot(series['time'],series[field],marker,label=label)
+  for field,marker,label,size in zip(['x','y','z'],['r+','gx','b.'],['X','Y','Z'],[3,3,6]):
+    plt.plot(series['time'],series[field],marker,label=label,markersize=size)
   ax.set_xticklabels([])
   plt.ylabel('Posisition (m)')
   plt.legend(numpoints=1)
   plt.xlim(tmin,tmax)
 
   plt.subplot(212)
-  for field,marker,label in zip(['r','p','q'],['r+','gx','b.'],['Roll','Pitch','Yaw']):
-    plt.plot(series['time'],180.0*rpq[field]/numpy.pi,marker,label=label)
+  for field,marker,label,size in zip(['r','p','q'],['r+','gx','b.'],['Roll','Pitch','Yaw'],[3,3,6]):
+    plt.plot(series['time'],180.0*rpq[field]/numpy.pi,marker,label=label,markersize=size)
   plt.ylabel('Angle (deg)')
   plt.ylim(-180.0,180.0)
   plt.legend(numpoints=1)
@@ -221,6 +231,7 @@ def make_box_plots(data):
   plot_series_box(data,'p_angle','Yaw Sweep Errors',False)
 
 def make_trajectory_plots(data):
+  plot_trajectory(data, 'downward_upward_spiral_0_monocular_pose_estimator_estimated_pose', start=1530, end=2330,axes_scale=0.04,n_axes=7)
   H0 = transform_from_start(data['test_test_estimated_pose'])[1]
   plot_time_trajectory(data,'test_test_estimated_pose','Trajectory Estimate with Hue Information')
   plot_time_trajectory(data,'test2_test_estimated_pose','Trajectory Estimate without Hue Information',H0=H0)
