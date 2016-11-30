@@ -20,8 +20,8 @@
 			<param name= "certainty_threshold" value = "0.25" />
 			<param name= "valid_correspondence_threshold" value = "0.25" />
       <param name= "roi_border_thickness" value="20" />
-      <remap from="/camera/camera_info" to="/usb_cam/camera_info" />
-      <remap from="/camera/image_raw" to="/usb_cam/image_raw" />
+      <remap from="/camera/camera_info" to="/odroid6/usb_cam/camera_info" />
+      <remap from="/camera/image_raw" to="/odroid6/usb_cam/image_raw" />
 		</node>
 	
 		<node name="robot1" pkg="image_view" type="image_view" args="image:=image_with_detections" />
