@@ -7,6 +7,7 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/image_encodings.h>
 #include <cv_bridge/cv_bridge.h>
+#include <image_transport/image_transport.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <monocular_pose_estimator/MonocularPoseEstimatorConfig.h>
@@ -24,7 +25,9 @@ class BlobFilterNode {
     ros::Subscriber image_sub_;
     ros::Subscriber camera_info_sub_;
     
-    ros::Publisher blob_list_pub_;
+    image_transport::Publisher image_pub_;
+
+    ros::Publisher blob_list_pub_, distorted_blob_list_pub_;
 
     dynamic_reconfigure::Server<monocular_pose_estimator::MonocularPoseEstimatorConfig> dr_server_;
     bool have_camera_info_;

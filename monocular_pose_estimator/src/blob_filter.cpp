@@ -23,8 +23,13 @@ BlobFilterNode::BlobFilterNode(const ros::NodeHandle& nh, const ros::NodeHandle&
 
   image_sub_ = nh_.subscribe("image_raw", 1, &BlobFilterNode::imageCallback, this);
   camera_info_sub_ = nh_.subscribe("camera_info", 1, &BlobFilterNode::cameraInfoCallback, this);
+  
+  // Initialize image publisher for visualization
+  image_transport::ImageTransport image_transport(nh_);
+  image_pub_ = image_transport.advertise("threshold_image", 1);
 
   blob_list_pub_ = nh_.advertise<monocular_pose_estimator::BlobList>("blob_list", 1);
+  distorted_blob_list_pub_ = nh_.advertise<monocular_pose_estimator::BlobList>("distorted_blob_list", 1);
 }
 
 BlobFilterNode::~BlobFilterNode() {}
@@ -68,15 +73,52 @@ void BlobFilterNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg
     return;
   }
   cv::Mat image = cv_ptr->image;
-  
-  monocular_pose_estimator::BlobList blob_list;
+
+  cv::Rect region_of_interest;
+  region_of_interest = cv::Rect(0, 0, image.cols, image.rows);
+  List2DPoints detected_led_positions;
+  std::vector<cv::Point2f> distorted_detection_centers;
+  cv::Mat output_image;
+  std::vector<int> blob_hues;
+
+  LEDDetector::findColorLeds(
+    image, region_of_interest, detection_threshold_value_, 
+    gaussian_sigma_, min_blob_area_, max_blob_area_, 
+    max_width_height_distortion_, max_circular_distortion_,
+    detected_led_positions, distorted_detection_centers, camera_matrix_K_,
+    camera_distortion_coeffs_, output_image, blob_hues);
+
+  monocular_pose_estimator::BlobList blob_list, distorted_blob_list;
 
   blob_list.header.stamp = image_msg->header.stamp;
+  blob_list.header.frame_id = image_msg->header.frame_id;
+  distorted_blob_list.header.stamp = image_msg->header.stamp;
+  distorted_blob_list.header.frame_id = image_msg->header.frame_id;
+
+  for (unsigned i = 0; i < detected_led_positions.size(); i++) {
+    geometry_msgs::Vector3 vec;
+    vec.x = detected_led_positions[i](0);
+    vec.y = detected_led_positions[i](1);
+    vec.z = blob_hues[i];
+    blob_list.blobs.push_back(vec);
+
+    geometry_msgs::Vector3 dist_vec;
+    dist_vec.x = distorted_detection_centers[i].x;
+    dist_vec.y = distorted_detection_centers[i].y;
+    dist_vec.z = blob_hues[i];
+    distorted_blob_list.blobs.push_back(dist_vec);
+  }
   
-  geometry_msgs::Vector3 vec;
-  vec.x = 1.0;
-  blob_list.blobs.push_back(vec);
   blob_list_pub_.publish(blob_list);
+  distorted_blob_list_pub_.publish(distorted_blob_list);
+  if (image_pub_.getNumSubscribers() > 0) {
+    cv_bridge::CvImage output_image_msg;
+    output_image_msg.header = image_msg->header;
+    //output_image_msg.encoding = sensor_msgs::image_encodings::BGR8;
+    output_image_msg.encoding = sensor_msgs::image_encodings::MONO8;
+    output_image_msg.image = output_image;
+    image_pub_.publish(output_image_msg.toImageMsg());
+  }
 }
 
 void BlobFilterNode::dynamicParametersCallback(monocular_pose_estimator::MonocularPoseEstimatorConfig &config, uint32_t level) {
