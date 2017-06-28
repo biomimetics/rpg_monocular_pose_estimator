@@ -9,11 +9,13 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
   dynamic_reconfigure
+  std_msgs
   sensor_msgs
   geometry_msgs
   monocular_pose_estimator_lib
   cmake_modules
   nodelet
+  message_generation
 )
 
 # since we need eigen search it as well
@@ -26,10 +28,21 @@ find_package(OpenCV REQUIRED)
 # Generate the reconfigure options
 generate_dynamic_reconfigure_options(cfg/MonocularPoseEstimator.cfg)
 
+add_message_files(DIRECTORY msg
+  FILES
+  BlobList.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs
+  std_msgs
+)
+
 # export the dependencies of this package for who ever depends on us
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp cv_bridge image_transport dynamic_reconfigure sensor_msgs geometry_msgs monocular_pose_estimator_lib nodelet
+  CATKIN_DEPENDS message_runtime roscpp cv_bridge image_transport dynamic_reconfigure sensor_msgs geometry_msgs monocular_pose_estimator_lib nodelet
   DEPENDS eigen OpenCV
 )
 
@@ -65,4 +78,16 @@ target_link_libraries(monocular_pose_estimator_nodelet
    ${catkin_LIBRARIES}
    ${OpenCV_LIBRARIES}
  )
- 
+
+# make blob filter node
+add_executable(blob_filter
+  src/blob_filter.cpp
+)
+
+add_dependencies(blob_filter ${catkin_EXPORTED_TARGETS}  ${PROJECT_NAME}_gencfg)
+
+target_link_libraries(blob_filter
+   yaml-cpp
+   ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
+ )
