@@ -90,4 +90,17 @@ target_link_libraries(blob_filter
    yaml-cpp
    ${catkin_LIBRARIES}
    ${OpenCV_LIBRARIES}
- )
+)
+
+# make visualization node
+add_executable(visualization_node
+  src/visualization_node.cpp
+)
+
+add_dependencies(visualization_node ${catkin_EXPORTED_TARGETS}  ${PROJECT_NAME}_gencfg)
+
+target_link_libraries(visualization_node
+   yaml-cpp
+   ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
+)

@@ -3,9 +3,9 @@
 
 	<group ns="usb_cam" >
 		<node name="blob_filter" pkg="monocular_pose_estimator" type="blob_filter" respawn="false" output="screen"> 
-			<param name= "threshold_value" value = "200" />
+			<param name= "threshold_value" value = "150" />
 			<param name= "gaussian_sigma" value = "0.6" />
-			<param name= "min_blob_area" value = "9" />
+			<param name= "min_blob_area" value = "4" />
 			<param name= "max_blob_area" value = "3000" />
 			<param name= "max_width_height_distortion" value = "0.75" />
 			<param name= "max_circular_distortion" value = "0.75" />
@@ -15,6 +15,8 @@
 			<param name= "valid_correspondence_threshold" value = "0.25" />
       <param name= "roi_border_thickness" value="20" />
 		</node>
+
+    <node name="visualization_node" pkg="monocular_pose_estimator" type="visualization_node" respawn="false" output="screen" />
 	</group>
 
 </launch>

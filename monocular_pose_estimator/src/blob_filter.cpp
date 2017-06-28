@@ -111,10 +111,10 @@ void BlobFilterNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg
   
   blob_list_pub_.publish(blob_list);
   distorted_blob_list_pub_.publish(distorted_blob_list);
+
   if (image_pub_.getNumSubscribers() > 0) {
     cv_bridge::CvImage output_image_msg;
     output_image_msg.header = image_msg->header;
-    //output_image_msg.encoding = sensor_msgs::image_encodings::BGR8;
     output_image_msg.encoding = sensor_msgs::image_encodings::MONO8;
     output_image_msg.image = output_image;
     image_pub_.publish(output_image_msg.toImageMsg());
