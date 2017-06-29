@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   monocular_pose_estimator_lib
   cmake_modules
   nodelet
+  exploration
   message_generation
 )
 
