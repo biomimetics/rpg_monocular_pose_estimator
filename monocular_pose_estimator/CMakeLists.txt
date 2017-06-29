@@ -104,3 +104,16 @@ target_link_libraries(visualization_node
    ${catkin_LIBRARIES}
    ${OpenCV_LIBRARIES}
 )
+
+# make pose estimator node
+add_executable(pose_estimator_node
+  src/pose_estimator_node.cpp
+)
+
+add_dependencies(pose_estimator_node ${catkin_EXPORTED_TARGETS}  ${PROJECT_NAME}_gencfg)
+
+target_link_libraries(pose_estimator_node
+   yaml-cpp
+   ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
+)

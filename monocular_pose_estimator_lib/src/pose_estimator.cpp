@@ -184,6 +184,10 @@ void PoseEstimator::setImagePoints(List2DPoints points)
   PoseEstimator::calculateImageVectors();
 }
 
+void PoseEstimator::setBlobHues(std::vector<int> blob_hues) {
+  blob_hues_ = blob_hues;
+}
+
 void PoseEstimator::setPredictedPixels(List2DPoints points)
 {
   predicted_pixel_positions_ = points;

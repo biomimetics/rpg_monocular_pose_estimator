@@ -1,5 +1,5 @@
 <launch>
-  <include file="$(find monocular_pose_estimator)/launch/webcam.launch" />
+  <!--include file="$(find monocular_pose_estimator)/launch/webcam.launch" /-->
 
 	<group ns="usb_cam" >
 		<node name="blob_filter" pkg="monocular_pose_estimator" type="blob_filter" respawn="false" output="screen"> 

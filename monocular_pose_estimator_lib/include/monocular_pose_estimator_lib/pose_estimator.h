@@ -443,7 +443,8 @@ public:
    * \see image_points
    */
   void setImagePoints(List2DPoints points);
-
+  
+  void setBlobHues(std::vector<int> blob_hues);
   /**
    * Returns the image points of the detected LEDs/markers.
    *
