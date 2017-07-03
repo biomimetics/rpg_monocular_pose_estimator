@@ -58,6 +58,10 @@ public:
    * \param camera_distortion_coeffs the vector containing the 4, 5 or 8 distortion coefficients of the camera \f$ (k_1, k_2, p_1, p_2[, k_3[, k_4, k_5, k_6]]) \f$
    *
    */
+  static void addPoseToImage(
+    cv::Mat &image, Eigen::Matrix4d transform, const cv::Mat camera_matrix_K,
+    const std::vector<double> camera_distortion_coeffs);
+
   static void projectOrientationVectorsOnImage(cv::Mat &image, const std::vector<cv::Point3f> points_to_project,
                                                const cv::Mat camera_matrix_K,
                                                const std::vector<double> camera_distortion_coeffs);

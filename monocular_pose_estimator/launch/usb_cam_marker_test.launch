@@ -1,0 +1,23 @@
+<launch>
+  <group ns='robot_00'>
+    <include file="$(find monocular_pose_estimator)/launch/webcam.launch" />
+    <group ns='camera_0'>
+      <!--include file="$(find monocular_pose_estimator)/launch/factored.launch" /-->
+    </group>
+  </group>
+
+  <group ns='robot_01'>
+    <node name='ros_zumy_node' pkg='ros_zumy' type='zumy_ros_bridge.py' />
+    <group ns='markers_0'>
+      <node name='marker_controller' pkg='exploration' type='marker_controller.py' />
+      <node name='marker_planner' pkg='exploration' type='marker_planner.py' />
+    </group>
+  </group>
+
+  <node name='active_pub' pkg='rostopic' type='rostopic' args='pub -r 10 /active std_msgs/Bool "data: true"' />
+
+  <node name='marker_aggregator' pkg='exploration' type='marker_aggregator.py' args="1.0" output="screen" />
+
+  <rosparam command="load" file="$(find monocular_pose_estimator)/param/usb_cam_marker_test.yml" />
+
+</launch>

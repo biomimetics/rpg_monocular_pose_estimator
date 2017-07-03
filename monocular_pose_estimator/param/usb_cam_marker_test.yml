@@ -1,0 +1,42 @@
+scene_file: "walls.ttt"
+objects: [
+  {
+    model_filename: "ros_clock.ttm"
+  },
+]
+robots: [
+  {
+    model_filename: "ros_zumy_base.ttm",
+    position: [0.0, 0.0, 0.0],
+    orientation: [0.0, 0.0, 0.0, 1.0],
+    children: [
+      {
+        model_filename: "ros_camera.ttm",
+        topic: "camera",
+        position: [0.0, 0.0, 0.05],
+        orientation: [-0.5, 0.5, -0.5, 0.5],
+      },
+    ]
+  },
+  {
+    model_filename: "ros_zumy_base.ttm",
+    position: [0.0, 0.0, 0.0],
+    orientation: [0.0, 0.0, 0.0, 1.0],
+    children: [
+      {
+        model_filename: "ros_markers.ttm",
+        topic: "markers",
+        position: [0.0, 0.0, 0.0],
+        orientation: [0.0, 0.0, 0.0, 1.0],
+        marker_positions: [
+          {h:  -1.0, x: -0.100, y:  0.060, z: 0.060}, #R0
+          {h:  -1.0, x: -0.060, y: -0.030, z: 0.100}, #Y0
+          {h:  -1.0, x:  0.000, y: -0.075, z: 0.060}, #G0
+          {h:  -1.0, x:  0.060, y: -0.030, z: 0.100}, #C0
+          {h:  -1.0, x:  0.100, y:  0.060, z: 0.060}, #B0
+          {h:  -1.0, x:  0.000, y:  0.030, z: 0.100}, #M0
+        ]
+      },
+    ]
+  },
+]

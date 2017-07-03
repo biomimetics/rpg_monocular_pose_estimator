@@ -34,10 +34,10 @@ namespace monocular_pose_estimator
 {
 
 // Function that projects the RGB orientation vectors back onto the image
-void Visualization::projectOrientationVectorsOnImage(cv::Mat &image, const std::vector<cv::Point3f> points_to_project,
-                                                     const cv::Mat camera_matrix_K,
-                                                     const std::vector<double> camera_distortion_coeffs)
-{
+void Visualization::projectOrientationVectorsOnImage(
+  cv::Mat &image, const std::vector<cv::Point3f> points_to_project,
+  const cv::Mat camera_matrix_K,
+  const std::vector<double> camera_distortion_coeffs) {
 
   std::vector<cv::Point2f> projected_points;
 
@@ -52,50 +52,61 @@ void Visualization::projectOrientationVectorsOnImage(cv::Mat &image, const std::
   cv::line(image, projected_points[0], projected_points[1], CV_RGB(255, 0, 0));
   cv::line(image, projected_points[0], projected_points[2], CV_RGB(0, 255, 0));
   cv::line(image, projected_points[0], projected_points[3], CV_RGB(0, 0, 255));
-
 }
 
-void Visualization::createVisualizationImage(cv::Mat &image, const bool found_body_pose, 
-                                             Eigen::Matrix4d transform, const cv::Mat camera_matrix_K,
-                                             const std::vector<double> camera_distortion_coeffs,
-                                             cv::Rect region_of_interest,
-                                             std::vector<cv::Point2f> distorted_detection_centers, std::vector<int> blob_hues)
-{
+void Visualization::addPoseToImage(
+  cv::Mat &image, Eigen::Matrix4d transform, const cv::Mat camera_matrix_K,
+  const std::vector<double> camera_distortion_coeffs) {
+  
+  ROS_INFO("Visualization adding pose:");
+  std::cout << transform << "\n";
+
+  // Length of the orientation trivectors
+  const double orientation_vector_length = 0.1;
+
+  // Matrix holding the points for the orientation trivector
+  Eigen::Matrix4d orientation_vector_points;
+  orientation_vector_points.col(0) << 0, 0, 0, 1;
+  orientation_vector_points.col(1) << orientation_vector_length, 0, 0, 1;
+  orientation_vector_points.col(2) << 0, orientation_vector_length, 0, 1;
+  orientation_vector_points.col(3) << 0, 0, orientation_vector_length, 1;
+
+  Eigen::Matrix4d visualisation_pts = transform * orientation_vector_points;
+
+  std::vector<cv::Point3f> points_to_project;
+  points_to_project.resize(4);
+
+  points_to_project[0].x = visualisation_pts(0, 0);
+  points_to_project[0].y = visualisation_pts(1, 0);
+  points_to_project[0].z = visualisation_pts(2, 0);
+  points_to_project[1].x = visualisation_pts(0, 1);
+  points_to_project[1].y = visualisation_pts(1, 1);
+  points_to_project[1].z = visualisation_pts(2, 1);
+  points_to_project[2].x = visualisation_pts(0, 2);
+  points_to_project[2].y = visualisation_pts(1, 2);
+  points_to_project[2].z = visualisation_pts(2, 2);
+  points_to_project[3].x = visualisation_pts(0, 3);
+  points_to_project[3].y = visualisation_pts(1, 3);
+  points_to_project[3].z = visualisation_pts(2, 3);
+
+  projectOrientationVectorsOnImage(image, points_to_project, camera_matrix_K, camera_distortion_coeffs);
+}
+
+void Visualization::createVisualizationImage(
+  cv::Mat &image, const bool found_body_pose, 
+  Eigen::Matrix4d transform, const cv::Mat camera_matrix_K,
+  const std::vector<double> camera_distortion_coeffs,
+  cv::Rect region_of_interest,
+  std::vector<cv::Point2f> distorted_detection_centers,
+  std::vector<int> blob_hues) {
+
   if (found_body_pose) {
-    //!< Length of the orientation trivectors that will be projected onto the output image
-    const double orientation_vector_length = 0.1; 
-
-    Eigen::Matrix4d orientation_vector_points; // Matrix holding the points for the orientation trivector that will be projected onto the output image in the object body frame of reference
-    orientation_vector_points.col(0) << 0, 0, 0, 1;
-    orientation_vector_points.col(1) << orientation_vector_length, 0, 0, 1;
-    orientation_vector_points.col(2) << 0, orientation_vector_length, 0, 1;
-    orientation_vector_points.col(3) << 0, 0, orientation_vector_length, 1;
-
-    Eigen::Matrix4d visualisation_pts = transform * orientation_vector_points;
-
-    std::vector<cv::Point3f> points_to_project;
-    points_to_project.resize(4);
-
-    points_to_project[0].x = visualisation_pts(0, 0);
-    points_to_project[0].y = visualisation_pts(1, 0);
-    points_to_project[0].z = visualisation_pts(2, 0);
-    points_to_project[1].x = visualisation_pts(0, 1);
-    points_to_project[1].y = visualisation_pts(1, 1);
-    points_to_project[1].z = visualisation_pts(2, 1);
-    points_to_project[2].x = visualisation_pts(0, 2);
-    points_to_project[2].y = visualisation_pts(1, 2);
-    points_to_project[2].z = visualisation_pts(2, 2);
-    points_to_project[3].x = visualisation_pts(0, 3);
-    points_to_project[3].y = visualisation_pts(1, 3);
-    points_to_project[3].z = visualisation_pts(2, 3);
-
-    projectOrientationVectorsOnImage(image, points_to_project, camera_matrix_K, camera_distortion_coeffs);
+    addPoseToImage(image, transform, camera_matrix_K, camera_distortion_coeffs);
   }
 
   cv::Point2f pt1, pt2;
   // Draw colored crosshairs over the detected LED with same color as detected blob
-  for (int i = 0; i < distorted_detection_centers.size(); i++)
-  {
+  for (int i = 0; i < distorted_detection_centers.size(); i++) {
     cv::Mat bgr_pixel(1, 1, CV_8UC3, cv::Scalar(0,0,255));
     cv::Mat hsv_pixel(1, 1, CV_8UC3, cv::Scalar(blob_hues[i],255,255));
     cv::cvtColor(hsv_pixel, bgr_pixel, cv::COLOR_HSV2BGR);
@@ -122,7 +133,7 @@ void Visualization::createVisualizationImage(cv::Mat &image, const bool found_bo
   }
 
   // Draw region of interest
-  cv::rectangle(image, region_of_interest, CV_RGB(0, 0, 255), 2);
+  //cv::rectangle(image, region_of_interest, CV_RGB(0, 0, 255), 2);
 }
 
 } // namespace

@@ -14,6 +14,8 @@
 
 #include <boost/thread/mutex.hpp>
 
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
+
 namespace monocular_pose_estimator {
 
 class VisualizationNode {
@@ -24,6 +26,8 @@ class VisualizationNode {
     ros::Subscriber image_sub_;
     ros::Subscriber camera_info_sub_;
     ros::Subscriber distorted_blob_list_sub_;
+    ros::Subscriber estimated_pose_sub_;
+    ros::Subscriber correspondence_list_sub_;
 
     image_transport::Publisher image_pub_;
 
@@ -36,6 +40,9 @@ class VisualizationNode {
     cv::Mat last_image_;
     std::vector<geometry_msgs::Vector3> last_blobs_;
     boost::mutex mutex_;
+    
+    //std::vector<const monocular_pose_estimator::BlobList::ConstPtr> correspondence_lists_;
+    std::vector<geometry_msgs::PoseWithCovarianceStamped> estimated_poses_;
 
   public:
     VisualizationNode(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
@@ -47,6 +54,10 @@ class VisualizationNode {
     void imageCallback(const sensor_msgs::Image::ConstPtr& image_msg);
 
     void distortedBlobListCallback(const monocular_pose_estimator::BlobList::ConstPtr& blob_list_msg);
+
+    void estimatedPoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& pose_msg);
+
+    void correspondenceListCallback(const monocular_pose_estimator::BlobList::ConstPtr& correspondence_list_msg);
 };
 
 }

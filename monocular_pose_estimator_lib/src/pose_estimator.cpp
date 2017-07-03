@@ -184,8 +184,14 @@ void PoseEstimator::setImagePoints(List2DPoints points)
   PoseEstimator::calculateImageVectors();
 }
 
-void PoseEstimator::setBlobHues(std::vector<int> blob_hues) {
-  blob_hues_ = blob_hues;
+void PoseEstimator::setBlobHues(std::vector<int>& blob_hues) {
+  blob_hues_.resize(blob_hues.size());
+  //ROS_INFO("Poe Estimator setting blob hues%d",(int)blob_hues.size());
+  for(unsigned i = 0; i < blob_hues_.size(); i++) {
+    blob_hues_[i] = blob_hues[i];
+    //std::cout << blob_hues_[i] << ", ";
+  }
+  //std::cout << "\n";
 }
 
 void PoseEstimator::setPredictedPixels(List2DPoints points)
@@ -380,6 +386,9 @@ double PoseEstimator::calculateSquaredReprojectionErrorAndCertainty(const List2D
     }
   }
   distances = distances.cwiseSqrt(); // Square root to get distances
+  
+  //ROS_INFO("Pose estimator distance matrix");
+  //std::cout << distances << "\n";
 
   double min_value;
   unsigned row_idx, col_idx;
@@ -464,7 +473,7 @@ unsigned PoseEstimator::checkCorrespondences(double &ratio)
   unsigned num_valid_correspondences = 0;
   ratio = -1.0;
   // The unit image vectors from the camera out to the object points are already set when the image points are set in PoseEstimator::setImagePoints()
-  ROS_INFO("Check Correspondences");
+  //ROS_INFO("Check Correspondences");
   printCorrespondences();
 
   if (correspondences_.rows() < 4)
@@ -806,13 +815,11 @@ unsigned PoseEstimator::initialiseWithHues() {
   unsigned num_correspondences = 0;
   unsigned min_idx;
   double min_diff, diff;
-  
+
   for (unsigned blob_idx = 0; blob_idx < blob_hues_.size(); blob_idx++) {
     min_diff = INFINITY;
     min_idx = 0;
-    //std::cout << "\n" << blob_idx << ":\n";
     for (unsigned marker_idx = 0; marker_idx < marker_hues_.size(); marker_idx++) {
-      //std::cout << used_marker[marker_idx] << "\n";
       diff = std::abs(blob_hues_[blob_idx] - marker_hues_[marker_idx]);
       if (diff < min_diff) {
         min_diff = diff;
@@ -886,8 +893,9 @@ unsigned PoseEstimator::initialiseWithHues() {
     correspondences_ = correspondences;
     double ratio;
     unsigned result = checkCorrespondences(ratio);
+    ROS_INFO("Result: %0.2f, %d", (float)ratio, (int)result);
     //std::cout << "Result:" << result << "\n";
-    std::cout << ratio << "-" << result << ", ";
+    //std::cout << ratio << "-" << result << ", ";
     if (result == 1) {
       solutions.push_back(correspondences);
     }

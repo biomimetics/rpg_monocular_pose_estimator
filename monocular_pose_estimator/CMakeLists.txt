@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   dynamic_reconfigure
   std_msgs
+  nav_msgs
   sensor_msgs
   geometry_msgs
   monocular_pose_estimator_lib
@@ -37,13 +38,16 @@ add_message_files(DIRECTORY msg
 generate_messages(
   DEPENDENCIES
   geometry_msgs
+  sensor_msgs
+  nav_msgs
+  exploration
   std_msgs
 )
 
 # export the dependencies of this package for who ever depends on us
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS message_runtime roscpp cv_bridge image_transport dynamic_reconfigure sensor_msgs geometry_msgs monocular_pose_estimator_lib nodelet
+  CATKIN_DEPENDS message_runtime roscpp cv_bridge image_transport dynamic_reconfigure sensor_msgs geometry_msgs monocular_pose_estimator_lib nodelet exploration nav_msgs
   DEPENDS eigen OpenCV
 )
 
