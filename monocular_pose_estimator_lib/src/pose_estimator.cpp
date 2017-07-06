@@ -365,7 +365,10 @@ void PoseEstimator::calculateImageVectors()
     single_vector(1) = (image_points_(i)(1) - camera_matrix_K_.at<double>(1, 2)) / camera_matrix_K_.at<double>(1, 1);
     single_vector(2) = 1;
     image_vectors_(i) = single_vector / single_vector.norm();
+    //std::cout << "Vector hue:" << blob_hues_[i] << "\n";
+    //std::cout << image_vectors_(i) << "\n\n";
   }
+  
 }
 
 double PoseEstimator::calculateSquaredReprojectionErrorAndCertainty(const List2DPoints & image_pts,
@@ -467,29 +470,25 @@ unsigned PoseEstimator::checkCorrespondences() {
   checkCorrespondences(ratio);
 }
 
-unsigned PoseEstimator::checkCorrespondences(double &ratio)
-{
+unsigned PoseEstimator::checkCorrespondences(double &ratio) {
   bool valid_correspondences = 0;
   unsigned num_valid_correspondences = 0;
   ratio = -1.0;
   // The unit image vectors from the camera out to the object points are already set when the image points are set in PoseEstimator::setImagePoints()
   //ROS_INFO("Check Correspondences");
-  printCorrespondences();
+  //printCorrespondences();
 
-  if (correspondences_.rows() < 4)
-  {
+  if (correspondences_.rows() < 4) {
     return valid_correspondences;
-  }
-  else
-  {
+  } else {
     MatrixXYd mean_reprojected_object_points(4, object_points_.size());
     mean_reprojected_object_points.setZero();
 
     MatrixXYu combinations = Combinations::combinationsNoReplacement(correspondences_.rows(), 3);
     unsigned N = combinations.rows();
+    //std::cout << "Combinations:\n" << combinations << "\n\n";
 
-    for (unsigned i = 0; i < N; ++i)
-    {
+    for (unsigned i = 0; i < N; ++i) {
       //Declare and populate the feature vectors and world points required for the P3P algorithm
       Eigen::Matrix3d feature_vectors, world_points;
       Eigen::Matrix<Eigen::Matrix<double, 3, 4>, 4, 1> solutions;
@@ -508,22 +507,22 @@ unsigned PoseEstimator::checkCorrespondences(double &ratio)
 
       // Find the unused image and object points
       unsigned total_unused_correspondences = correspondences_.rows() - 3;
-      List2DPoints unused_im_points(total_unused_correspondences); // Vector to hold the indexes of the unused image points that have correspondences
-      List4DPoints unused_object_points(total_unused_correspondences); // Vector to hold the indexes of the unused object points that have correspondences
+      
+      // Vector to hold the indexes of the unused image points that have correspondences
+      List2DPoints unused_im_points(total_unused_correspondences); 
+      // Vector to hold the indexes of the unused object points that have correspondences
+      List4DPoints unused_object_points(total_unused_correspondences);
       unsigned num_unused_points = 0;
       bool already_used_correspondence = 0;
 
       // Search for the unused object points and image points
-      for (unsigned l = 0; l < correspondences_.rows(); ++l)
-      {
+      for (unsigned l = 0; l < correspondences_.rows(); ++l) {
         already_used_correspondence = 0;
-        for (unsigned n = 0; n < 3; ++n)
-        {
+        for (unsigned n = 0; n < 3; ++n) {
           if (combinations(i, n) - 1 == l)
             already_used_correspondence = 1;
         }
-        if (!already_used_correspondence)
-        {
+        if (!already_used_correspondence) {
           unused_object_points(num_unused_points) = object_points_(correspondences_(l, 0) - 1);
           unused_im_points(num_unused_points) = image_points_(correspondences_(l, 1) - 1);
           num_unused_points++;
@@ -535,10 +534,14 @@ unsigned PoseEstimator::checkCorrespondences(double &ratio)
 
       // Compute the poses using the P3P algorithm
       int executed_correctly = P3P::computePoses(feature_vectors, world_points, solutions);
+      //ROS_INFO("Evaluating combination %d of %d, p3p:%d", (int)i, (int)N, (int)executed_correctly);
+      //Eigen::IOFormat CommaInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", " << ", ";");
+      //Eigen::IOFormat OctaveFmt(Eigen::StreamPrecision, 0, " ", "\n", "", "", "", "");
+      //std::cout << "Feature vectors:\n" << feature_vectors << "\n\n";
+      //std::cout << "World points:\n" << world_points << "\n\n";
 
       // If the P3P algorithm found a solution (i.e. the world points were not aligned), then continue
-      if (executed_correctly == 0)
-      {
+      if (executed_correctly == 0) {
 
         double squared_error;
         double min_squared_error = INFINITY;
@@ -548,32 +551,31 @@ unsigned PoseEstimator::checkCorrespondences(double &ratio)
         Eigen::Matrix4d H_o_c_current;
 
         // Loop through the four solutions provided by the P3P algorithm
-        for (unsigned j = 0; j < 4; ++j)
-        {
+        for (unsigned j = 0; j < 4; ++j) {
           H_o_c_current.setIdentity();
           H_o_c_current.block<3, 4>(0, 0) = solutions(j);
 
           // Consider only the real poses. Complex or NaN poses are excluded/ignored
-          if (isFinite(H_o_c_current))
-          {
+          if (isFinite(H_o_c_current)) {
             //Back-project the unused object points onto the image plane
             List2DPoints unused_back_projected_object_points(total_unused_correspondences);
             Eigen::Vector3d temp;
-            for (unsigned ii = 0; ii < total_unused_correspondences; ++ii)
-            {
-              unused_back_projected_object_points(ii) = project2d(unused_object_points(ii), H_o_c_current.inverse());
+
+            //std::cout << "H" << j << ":\n" << H_o_c_current << "\n\n";
+
+            for (unsigned ii = 0; ii < total_unused_correspondences; ++ii) {
+              unused_back_projected_object_points(ii) = project2d(
+                unused_object_points(ii), H_o_c_current.inverse()
+              );
             }
 
             double certainty;
-            squared_error = calculateSquaredReprojectionErrorAndCertainty(unused_im_points,
-                                                                          unused_back_projected_object_points,
-                                                                          certainty);
-
-            if (certainty >= certainty_threshold_)
-            {
+            squared_error = calculateSquaredReprojectionErrorAndCertainty(
+              unused_im_points, unused_back_projected_object_points, certainty);
+            //std::cout << "Squared error:" << squared_error << ", certainty:" << certainty << "\n";
+            if (certainty >= certainty_threshold_) {
               valid_correspondence_found = 1;
-              if (squared_error < min_squared_error)
-              {
+              if (squared_error < min_squared_error) {
                 min_squared_error = squared_error;
                 smallest_error_idx = j;
               }
@@ -581,40 +583,32 @@ unsigned PoseEstimator::checkCorrespondences(double &ratio)
           }
         }
 
-        if (valid_correspondence_found)
-        {
+        if (valid_correspondence_found) {
           num_valid_correspondences++;
           Eigen::Matrix4d temp_solution;
           temp_solution.setIdentity();
           temp_solution.block<3, 4>(0, 0) = solutions(smallest_error_idx);
 
-          for (unsigned jj = 0; jj < object_points_.size(); ++jj)
-          {
+          for (unsigned jj = 0; jj < object_points_.size(); ++jj) {
             mean_reprojected_object_points.col(jj) = mean_reprojected_object_points.col(jj)
                 + temp_solution.inverse() * object_points_(jj);
           }
-
         }
-
       }
-
     }
 
     ratio = (double) num_valid_correspondences / N ;
-    if (ratio >= valid_correspondence_threshold_)
-    {
+    if (ratio >= valid_correspondence_threshold_) {
       valid_correspondences = 1;
       mean_reprojected_object_points = mean_reprojected_object_points / num_valid_correspondences;
       MatrixXYd object_points_matrix(4, object_points_.size());
-      for (unsigned kk = 0; kk < object_points_.size(); ++kk)
-      {
+      for (unsigned kk = 0; kk < object_points_.size(); ++kk) {
         object_points_matrix.col(kk) = object_points_(kk);
       }
       object_points_matrix.conservativeResize(3, object_points_matrix.cols());
       mean_reprojected_object_points.conservativeResize(3, mean_reprojected_object_points.cols());
       predicted_pose_ = computeTransformation(object_points_matrix, mean_reprojected_object_points);
     }
-
   }
 
   //ROS_INFO("Check Correspondences Done");
@@ -777,7 +771,6 @@ unsigned PoseEstimator::initialise()
           }
         }
       }
-
     }
   }
 
@@ -872,6 +865,7 @@ unsigned PoseEstimator::initialiseWithHues() {
  
   std::vector<VectorXuPairs> solutions;
   //std::cout << "Results:";
+  //std::cout << "N Checks:" << n_checks << "\n";
 
   for (unsigned check_number = 0; check_number < n_checks; check_number++) {
     VectorXuPairs correspondences(blob_hues_.size(), 2);
@@ -893,7 +887,7 @@ unsigned PoseEstimator::initialiseWithHues() {
     correspondences_ = correspondences;
     double ratio;
     unsigned result = checkCorrespondences(ratio);
-    ROS_INFO("Result: %0.2f, %d", (float)ratio, (int)result);
+    //ROS_INFO("Result: %0.2f, %d", (float)ratio, (int)result);
     //std::cout << "Result:" << result << "\n";
     //std::cout << ratio << "-" << result << ", ";
     if (result == 1) {

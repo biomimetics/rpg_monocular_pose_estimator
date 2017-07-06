@@ -58,8 +58,8 @@ void Visualization::addPoseToImage(
   cv::Mat &image, Eigen::Matrix4d transform, const cv::Mat camera_matrix_K,
   const std::vector<double> camera_distortion_coeffs) {
   
-  ROS_INFO("Visualization adding pose:");
-  std::cout << transform << "\n";
+  //ROS_INFO("Visualization adding pose:");
+  //std::cout << transform << "\n";
 
   // Length of the orientation trivectors
   const double orientation_vector_length = 0.1;

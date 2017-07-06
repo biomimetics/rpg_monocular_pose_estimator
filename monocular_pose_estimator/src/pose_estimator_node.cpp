@@ -60,7 +60,7 @@ void PoseEstimatorNode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstP
 
 // convert RGB marker state to 0-180 hue integer
 int PoseEstimatorNode::state_to_hue(std::vector<uint8_t> state) {
-  cv::Mat bgr_state(1, 1, CV_8UC3, cv::Scalar(state[2],state[1],state[0]));
+  cv::Mat bgr_state(1, 1, CV_8UC3, cv::Scalar(state[0],state[1],state[2]));
   cv::Mat hsv_state;
   cv::cvtColor(bgr_state, hsv_state, cv::COLOR_BGR2HSV);
   std::vector<cv::Mat> hsv_channels(3);

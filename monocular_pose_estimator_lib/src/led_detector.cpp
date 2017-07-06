@@ -52,15 +52,18 @@ void LEDDetector::findColorLeds(const cv::Mat &image, cv::Rect ROI,
   std::vector<cv::Mat> hsv_channels(3);
   cv::split(hsv_image, hsv_channels);
 
-  // Threshold image based on (blurred?) Saturation value
-  cv::Mat thresh_image;
-  cv::threshold(hsv_channels[2], thresh_image, threshold_value, 255, cv::THRESH_BINARY);
-
   // Gaussian blur the image
+  cv::Mat blur_image;
   cv::Size ksize; // Gaussian kernel size. If equal to zero, then the kernel size is computed from the sigma
   ksize.width = 0;
   ksize.height = 0;
-  GaussianBlur(thresh_image.clone(), output_image, ksize, gaussian_sigma, gaussian_sigma, cv::BORDER_DEFAULT);
+  GaussianBlur(hsv_channels[2].clone(), blur_image, ksize, gaussian_sigma, gaussian_sigma, cv::BORDER_DEFAULT);
+
+  // Threshold image based on (blurred?) Saturation value
+  cv::Mat thresh_image;
+  cv::threshold(blur_image, thresh_image, threshold_value, 255, cv::THRESH_BINARY);
+
+  output_image = thresh_image;
 
   // Identify the blobs contours in the image
   std::vector<std::vector<cv::Point> > init_contours;
@@ -75,12 +78,17 @@ void LEDDetector::findColorLeds(const cv::Mat &image, cv::Rect ROI,
 
   for (unsigned i = 0; i < init_contours.size(); i++) {
     cv::Rect bounding_rect = cv::boundingRect(init_contours[i]);
-    cv::Mat region_mask = hsv_channels[2](bounding_rect);
+    //cv::Mat region_mask = hsv_channels[2](bounding_rect);
+    cv::Mat region_mask = thresh_image(bounding_rect);
     cv::Mat hue_region = hsv_channels[0](bounding_rect);
 
     cv::Scalar mean, stddev;
     cv::meanStdDev(hue_region, mean, stddev, region_mask);
     
+    //std::cout << "Region:" << i << " mean:" << mean.val[0] << "\n";
+    //std::cout << hue_region << "\n";
+    //std::cout << "Mask" << "\n";
+    //std::cout << region_mask << "\n\n";
     if (stddev.val[0] > 16.0) {
       //ROS_INFO("Splitting blob at %d %d %f", bounding_rect.x, bounding_rect.y, stddev.val[0]);
       //std::cout << hue_region;
