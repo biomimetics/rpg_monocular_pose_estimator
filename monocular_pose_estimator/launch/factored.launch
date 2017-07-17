@@ -2,10 +2,10 @@
   <node name="blob_filter" pkg="monocular_pose_estimator" type="blob_filter" respawn="false" output="screen"> 
     <param name= "threshold_value" value = "200" />
     <param name= "gaussian_sigma" value = "0.6" />
-    <param name= "min_blob_area" value = "4" />
+    <param name= "min_blob_area" value = "1" />
     <param name= "max_blob_area" value = "3000" />
-    <param name= "max_width_height_distortion" value = "0.75" />
-    <param name= "max_circular_distortion" value = "0.75" />
+    <param name= "max_width_height_distortion" value = "1.0" />
+    <param name= "max_circular_distortion" value = "1.0" />
   </node>
   
   <node name="pose_estimator_node" pkg="monocular_pose_estimator" type="pose_estimator_node" respawn="false" output="screen">
