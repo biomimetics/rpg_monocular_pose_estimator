@@ -26,7 +26,23 @@ The positions of the LEDs on the target object are provided by the user in a YAM
 
 ### Publication
 
-If you use this work in an academic context, please cite the following [ICRA 2014 publication](http://rpg.ifi.uzh.ch/docs/ICRA14_Faessler.pdf):
+If you use this work in an academic context, please cite the following:
+
+Austin D. Buchan, Daniel Duecker, Eugen Solowjow, Edwin Kreuzer:
+**Low-Cost Monocular Localization with Active Markers for Micro Autonomous Underwater Vehicles**
+IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). Vancouver, 2017.
+
+```latex
+@inproceedings{buchan_2017_icra,
+  title={{Low-Cost Monocular Localization with Active Markers for Micro Autonomous Underwater Vehicles}},
+  author={Buchan, Austin D. and Duecker, Daniel and Solowjow, Eugen and Kreuzer, Edwin},
+  booktitle={IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) (accepted)},
+  year={2017},
+  organization={IEEE}
+}
+```
+
+And the original work:[ICRA 2014 publication](http://rpg.ifi.uzh.ch/docs/ICRA14_Faessler.pdf):
 
 M. Faessler, E. Mueggler, K. Schwabe, D. Scaramuzza: 
 **A Monocular Pose Estimation System based on Infrared LEDs.**
